@@ -56,9 +56,18 @@ class Task:
     def getCost(self):
         return self.__cost
 
+    def getPriority(self):
+        return 0
+
     def __str__(self):
         return "{}.{}".format(self.__subcheck, self.__index)
 
 class Bin:
     def __init__(self):
-        pass
+        self.__tasks = []
+
+    def addTask(self, t):
+        self.__tasks.append(t)
+
+    def getCost(self):
+        return sum([t.getCost() for t in self.__tasks])

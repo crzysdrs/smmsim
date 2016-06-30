@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from scheduler import CheckGroup, Check, Task
+from scheduler import CheckGroup, Check, Task, Bin
 
 def tasksplitter(checkgroups):
     tasksize = 50
@@ -16,6 +16,29 @@ def tasksplitter(checkgroups):
                 i += 1
 
     return tasks
+
+
+class BinPacker:
+    def __init__(self, tasks, binsize):
+        self.__tasks = tasks
+        self.__queue = []
+        self.__binsize = binsize
+
+    def requestBin(self, time):
+        b = Bin()
+        while b.getCost() < self.__binsize:
+            if len(self.__queue) == 0:
+                self.__queue = list(self.__tasks)
+                self.__queue.sort(key=lambda t : t.getPriority())
+
+            front = self.__queue[0]
+            self.__queue = self.__queue[1:]
+            if front.getCost() + b.getCost() <= self.__binsize:
+                b.addTask(front)
+            else:
+                return b
+
+        return b
 
 def main():
     checks = [
@@ -63,6 +86,26 @@ def main():
 
     for t in tasks:
         print t
+
+    #all times are in microseconds
+    one_second = 10**6
+    time = 0
+    target_time = 50 * one_second
+    binsize = 100
+    packer = BinPacker(tasks, binsize)
+    smm_cost = 70
+    smm_per_second = 10
+
+    next_time = 0
+    while time < target_time:
+        b = packer.requestBin(time)
+        print time, b.getCost()
+        next_time = time + one_second/smm_per_second
+        time += b.getCost() + smm_cost
+
+        #Assumes that overlapping bins will wait until previous bin finishes
+        if next_time > time:
+            time = next_time
 
 if __name__ == "__main__":
     main()
