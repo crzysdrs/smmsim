@@ -57,7 +57,7 @@ class Task:
         return self.__cost
 
     def getPriority(self):
-        return 0
+        return 1
 
     def __str__(self):
         return "{}.{}".format(self.__subcheck, self.__index)

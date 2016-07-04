@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from scheduler import CheckGroup, Check, Task, Bin
+from binpackers import *
 
 def tasksplitter(checkgroups):
     tasksize = 50
@@ -18,27 +19,6 @@ def tasksplitter(checkgroups):
     return tasks
 
 
-class BinPacker:
-    def __init__(self, tasks, binsize):
-        self.__tasks = tasks
-        self.__queue = []
-        self.__binsize = binsize
-
-    def requestBin(self, time):
-        b = Bin()
-        while b.getCost() < self.__binsize:
-            if len(self.__queue) == 0:
-                self.__queue = list(self.__tasks)
-                self.__queue.sort(key=lambda t : t.getPriority())
-
-            front = self.__queue[0]
-            self.__queue = self.__queue[1:]
-            if front.getCost() + b.getCost() <= self.__binsize:
-                b.addTask(front)
-            else:
-                return b
-
-        return b
 
 def main():
     checks = [
@@ -92,7 +72,8 @@ def main():
     time = 0
     target_time = 50 * one_second
     binsize = 100
-    packer = BinPacker(tasks, binsize)
+    #packer = DefaultBin(tasks, binsize)
+    packer = MaxFillBin(tasks, binsize)
     smm_cost = 70
     smm_per_second = 10
 
