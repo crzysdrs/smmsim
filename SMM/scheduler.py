@@ -71,3 +71,46 @@ class Bin:
 
     def getCost(self):
         return sum([t.getCost() for t in self.__tasks])
+
+
+def getChecks():
+    return [
+        CheckGroup(
+            'IDTcheck', [
+                Check('IDTR', 1),
+                Check('HashIdtTable', 10),
+                Check('IdtFunctionPtrWalker', 15),
+            ]
+        ),
+        CheckGroup(
+            'HyperCall', [
+                Check('HypercallTableAddr', 5),
+                Check('HypercallTableHash', 50),
+                Check('HypercallTableWalk', 100),
+            ]
+        ),
+        CheckGroup(
+            'GDT', [
+                Check('GDTR', 1),
+                Check('GdtHash', 50),
+            ]
+        ),
+        CheckGroup(
+            'Kernel', [
+                Check('KernelAddr', 20),
+                Check('KernelHash', 500),
+            ]
+        ),
+        CheckGroup(
+            'VmExit', [
+                Check('VmExitTableAddr', 1),
+                Check('VmExitTableHash', 5),
+                Check('VmExitTableWalk', 10),
+            ]
+        ),
+        CheckGroup(
+            'CR0', [
+                Check('CR0Val', 1),
+            ]
+        ),
+    ]
