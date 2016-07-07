@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Setup.py
 """
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='SMM',
@@ -12,10 +12,11 @@ setup(
     author_email='msouders@pdx.edu',
     scripts=[
     ],
+    packages = find_packages(),
     #package_dir={'': 'SMM'},
-    py_modules=[
-        'SMM'
-    ],
+    #py_modules=[
+    #    'SMM'
+    #],
     entry_points={
         'console_scripts': [
             'smm_sim = SMM.simulator:main'
