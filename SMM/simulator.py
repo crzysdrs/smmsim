@@ -32,7 +32,7 @@ def main():
                         default=10,  type=int, help='SMM Actions to Run Per Second.')
     parser.add_argument('--bin_size', dest='bin_size',
                         default=100, type=int, help='SMM Bin Size (microseconds).')
-    parser.add_argument('--smm_overhead', dest='smm_cost',
+    parser.add_argument('--smm_overhead', dest='smm_cost', type=int,
                         default=70,  help='Overhead of invoking SMM (microseconds).')
     parser.add_argument('sim_length', type=int,
                         help='Length of Simulation (seconds).')

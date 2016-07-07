@@ -74,7 +74,7 @@ class FillBin(DefaultBin):
             else:
                 break
 
-        self._queue = filter(lambda x : x is not None, self._queue)
+        self._queue = list(filter(lambda x : x is not None, self._queue))
         return b
 
 class MaxFillBin(FillBin):
