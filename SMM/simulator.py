@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-from SMM.scheduler import CheckGroup, Check, Task, Bin, getChecks
-import SMM.binpackers
-import SMM.checksplitters
+from scheduler import CheckGroup, Check, Task, Bin, getChecks
+import binpackers
+import checksplitters
 import argparse
-import SMM.log
+import log
 import sys, inspect
 import subprocess
 from time import gmtime, strftime
@@ -16,11 +16,11 @@ def classmembers(module):
     return inspect.getmembers(sys.modules[module], inspect.isclass)
 
 def main():
-    binpackers = classmembers("SMM.binpackers")
+    binpackers = classmembers("binpackers")
     binpackers = filter(lambda x : 'requestBin' in x[1].__dict__, binpackers)
     binpackers = dict(binpackers)
 
-    checksplitters = classmembers("SMM.checksplitters")
+    checksplitters = classmembers("checksplitters")
     checksplitters = filter(lambda x : 'splitChecks' in x[1].__dict__, checksplitters)
     checksplitters = dict(checksplitters)
 
@@ -53,9 +53,9 @@ def main():
     tasks = splitter.splitChecks(checks, args.granularity)
 
     if args.sqllog != "":
-        logger = SMM.log.SqliteLog(args.sqllog)
+        logger = log.SqliteLog(args.sqllog)
     else:
-        logger = SMM.log.SimLog()
+        logger = log.SimLog()
 
     misc = {
         'start_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),

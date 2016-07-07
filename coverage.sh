@@ -1,7 +1,9 @@
 #/bin/bash
 
-SMM_SIM=`which smm_sim`
-COV_RUN="coverage run"
+SMM_SIM=./SMM/simulator.py
+COV_RUN="coverage run --source=SMM"
+
+coverage erase
 
 $COV_RUN $SMM_SIM 10 || exit 1
 
