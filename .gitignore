@@ -1,5 +1,7 @@
 #### joe made this: http://goel.io/joe
 
+**/*.db
+
 #####=== Python ===#####
 
 # Byte-compiled / optimized / DLL files
@@ -90,4 +92,3 @@ tramp
 
 # cask packages
 .cask/
-

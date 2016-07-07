@@ -1,6 +1,6 @@
 #!/usr/bin/env
 import random
-from scheduler import Bin
+from SMM.scheduler import Bin
 
 class DefaultBin:
     def __init__(self, tasks, binsize):

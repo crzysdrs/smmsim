@@ -1,10 +1,16 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-from scheduler import CheckGroup, Check, Task, Bin, getChecks
-import binpackers
-import checksplitters
+from SMM.scheduler import CheckGroup, Check, Task, Bin, getChecks
+import SMM.binpackers
+import SMM.checksplitters
 import argparse
+import SMM.log
 import sys, inspect
+import subprocess
+from time import gmtime, strftime
+
+def get_git_revision_hash():
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).rstrip()
 
 def classmembers(module):
     return inspect.getmembers(sys.modules[module], inspect.isclass)
@@ -36,6 +42,9 @@ def main():
     parser.add_argument('--checksplitter', choices=checksplitters.keys(),
                         default="DefaultTasks",
                         help='The class that will convert checks into tasks.')
+    parser.add_argument('--sqllog', type=str,
+                        default="",
+                        help='Desired Location of sqlite log (WILL OVERWRITE).')
 
     args = parser.parse_args()
 
@@ -43,21 +52,60 @@ def main():
     splitter = checksplitters[args.checksplitter]()
     tasks = splitter.splitChecks(checks, args.granularity)
 
+    if args.sqllog != "":
+        logger = SMM.log.SqliteLog(args.sqllog)
+    else:
+        logger = SMM.log.SimLog()
+
+    misc = {
+        'start_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),
+        'start_local':strftime("%a, %d %b %Y %X +0000"),
+        'ver':get_git_revision_hash(),
+        'args': " ".join(map(lambda x : '"{}"'.format(x), sys.argv))
+    }
+
+    for k,v in misc.items():
+        logger.addMisc(k, v)
+
+    for t in tasks:
+        logger.addTask(0, t)
+
     #all times are in microseconds
-    one_second = 10**6
+    one_second = int(10**6)
     time = 0
     packer = binpackers[args.binpacker](tasks, args.bin_size)
     next_time = 0
     target_time = one_second * args.sim_length
+
+    cpu_id = 0
+
     while time < target_time:
         b = packer.requestBin(time)
-        print time, b.getCost()
-        next_time = time + one_second/args.smm_per_sec
-        time += b.getCost() + args.smm_cost
+        next_time = time + one_second//args.smm_per_sec
+        logger.genericEvent(time, cpu_id, "SMI", args.smm_cost)
+        time += args.smm_cost
+        logger.genericEvent(time, cpu_id, "Bin Begin", 0, bin=b)
+        for t in b.getTasks():
+            logger.taskEvent(time, t, cpu_id, b)
+            time += t.getCost()
+
+        logger.genericEvent(time, cpu_id, "Bin End", 0, bin=b)
 
         #Assumes that overlapping bins will wait until previous bin finishes
         if next_time > time:
             time = next_time
+        else:
+            logger.warning(time, "Current Bin Will not terminate before next Bin is scheduled")
+
+    misc = {
+        'end_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),
+        'end_local':strftime("%a, %d %b %Y %X +0000"),
+    }
+
+    for k,v in misc.items():
+        logger.addMisc(k, v)
+
+    logger.endLog()
 
 if __name__ == "__main__":
     main()

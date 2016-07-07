@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 class CheckGroup:
     def __init__(self, name, subchecks=None):
@@ -63,11 +63,20 @@ class Task:
         return "{}.{}".format(self.__subcheck, self.__index)
 
 class Bin:
+    bin_count = 0
     def __init__(self):
         self.__tasks = []
+        self.__id = Bin.bin_count
+        Bin.bin_count += 1
+
+    def getId(self):
+        return self.__id
 
     def addTask(self, t):
         self.__tasks.append(t)
+
+    def getTasks(self):
+        return self.__tasks
 
     def getCost(self):
         return sum([t.getCost() for t in self.__tasks])
