@@ -13,9 +13,9 @@ setup(
     scripts=[
     ],
     #package_dir={'': 'SMM'},
-    #py_modules=[
-    #    'SMM'
-    #],
+    py_modules=[
+        'SMM'
+    ],
     entry_points={
         'console_scripts': [
             'smm_sim = SMM.simulator:main'
