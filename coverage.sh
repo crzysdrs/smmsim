@@ -1,7 +1,7 @@
 #/bin/bash
 
 SMM_SIM=./SMM/simulator.py
-COV_RUN="coverage run --source=SMM"
+COV_RUN="coverage run --parallel-mode --source=SMM"
 
 coverage erase
 
