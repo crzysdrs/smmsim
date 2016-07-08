@@ -45,7 +45,10 @@ class Check:
         else:
             parent = '<UNDEFINED>'
 
-        return "{}.{}".format(parent, self.__name)
+        return "Check {}.{}".format(parent, self.__name)
+
+    def __repr__(self):
+        return self.__str__()
 
 class Task:
     def __init__(self, subcheck, index, cost):
@@ -60,7 +63,10 @@ class Task:
         return 1
 
     def __str__(self):
-        return "{}.{}".format(self.__subcheck, self.__index)
+        return "Task {}.{}".format(self.__subcheck, self.__index)
+
+    def __repr__(self):
+        return self.__str__()
 
 class Bin:
     bin_count = 0

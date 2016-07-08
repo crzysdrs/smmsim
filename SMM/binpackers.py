@@ -12,15 +12,15 @@ class DefaultBin:
         b = Bin()
         while b.getCost() < self._binsize:
             if len(self._queue) == 0:
-                self._queue = list(self._tasks)
-                self._queue.sort(key=f)
+                self._queue = (self._tasks)
+                self._queue = sorted(self._queue, key=f)
 
             front = self._queue[0]
-            self._queue = self._queue[1:]
             if front.getCost() + b.getCost() <= self._binsize:
                 b.addTask(front)
             else:
                 return b
+            self._queue = self._queue[1:]
 
         return b
 
@@ -29,7 +29,7 @@ class DefaultBin:
 
 class RandomBin(DefaultBin):
     def requestBin(self, time):
-        return self.getBinKey(time, lambda x : random.randint(0, len(self._tasks)))
+        return self.getBinKey(time, lambda *args : random.random())
 
 class FillBin(DefaultBin):
     def requestFillBin(self, criteria, time):
