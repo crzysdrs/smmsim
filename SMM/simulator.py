@@ -39,6 +39,9 @@ def main():
     parser.add_argument('--binpacker', choices=binpackers.keys(),
                         default="DefaultBin",
                         help='The BinPacker class that wille be used to fill bins.')
+    parser.add_argument('--cpus', type=int,
+                        default=1,
+                        help='Number of CPUs')
     parser.add_argument('--checksplitter', choices=checksplitters.keys(),
                         default="DefaultTasks",
                         help='The class that will convert checks into tasks.')
@@ -80,14 +83,19 @@ def main():
     cpu_id = 0
 
     while time < target_time:
-        b = packer.requestBin(time)
         next_time = time + one_second//args.smm_per_sec
-        logger.genericEvent(time, cpu_id, "SMI", args.smm_cost)
+        bins = []
+        for cpu_id in range(args.cpus):
+            bins.append(packer.requestBin(time, cpu_id))
+            logger.genericEvent(time, cpu_id, "SMI", args.smm_cost)
+
         time += args.smm_cost
-        logger.genericEvent(time, cpu_id, "Bin Begin", 0, bin=b)
-        for t in b.getTasks():
-            logger.taskEvent(time, t, cpu_id, b)
-            time += t.getCost()
+
+        for b, cpu_id in zip(bins, range(args.cpus)):
+            logger.genericEvent(time, cpu_id, "Bin Begin", 0, bin=b)
+            for t in b.getTasks():
+                logger.taskEvent(time, t, cpu_id, b)
+                time += t.getCost()
 
         logger.genericEvent(time, cpu_id, "Bin End", 0, bin=b)
 

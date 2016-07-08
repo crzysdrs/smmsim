@@ -24,11 +24,11 @@ class DefaultBin:
 
         return b
 
-    def requestBin(self, time):
+    def requestBin(self, time, cpu_id):
         return self.getBinKey(time, lambda x: x.getPriority())
 
 class RandomBin(DefaultBin):
-    def requestBin(self, time):
+    def requestBin(self, time, cpu_id):
         return self.getBinKey(time, lambda *args : random.random())
 
 class FillBin(DefaultBin):
@@ -78,9 +78,9 @@ class FillBin(DefaultBin):
         return b
 
 class MaxFillBin(FillBin):
-    def requestBin(self, time):
+    def requestBin(self, time, cpu_id):
         return self.requestFillBin(lambda x : x.getCost(), time)
 
 class MaxPriorityBin(FillBin):
-    def requestBin(self, time):
+    def requestBin(self, time, cpu_id):
         return self.requestFillBin(lambda x : x.getPriority(), time)

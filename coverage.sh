@@ -10,7 +10,7 @@ $COV_RUN $SMM_SIM 10 || exit 1
 
 $COV_RUN $SMM_SIM 10 --task_granularity 20 --bin_size 60 --smm_overhead 30 || exit 1
 
-$COV_RUN $SMM_SIM 10 || exit 1
+$COV_RUN $SMM_SIM 10 --cpus 4 || exit 1
 
 $COV_RUN $SMM_SIM 10 --binpacker MaxFillBin || exit 1
 
