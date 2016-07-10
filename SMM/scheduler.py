@@ -25,10 +25,11 @@ class CheckGroup:
         return self.__name
 
 class Check:
-    def __init__(self, name, cost):
+    def __init__(self, name, priority, cost):
         self.__name = name
         self.__cost = cost
         self.__group = None
+        self.__priority = priority
 
     def setGroup(self, group):
         self.__group = group
@@ -38,6 +39,12 @@ class Check:
 
     def getCost(self):
         return self.__cost
+
+    def getPriority(self):
+        return self.__priority
+
+    def setPriority(self, p):
+        self.__priority = p
 
     def __str__(self):
         if self.__group:
@@ -60,7 +67,7 @@ class Task:
         return self.__cost
 
     def getPriority(self):
-        return 1
+        return self.__subcheck.getPriority()
 
     def __str__(self):
         return "Task {}.{}".format(self.__subcheck, self.__index)
@@ -92,40 +99,40 @@ def getChecks():
     return [
         CheckGroup(
             'IDTcheck', [
-                Check('IDTR', 1),
-                Check('HashIdtTable', 10),
-                Check('IdtFunctionPtrWalker', 15),
+                Check('IDTR', 9, 1),
+                Check('HashIdtTable', 20, 10),
+                Check('IdtFunctionPtrWalker', 14, 15),
             ]
         ),
         CheckGroup(
             'HyperCall', [
-                Check('HypercallTableAddr', 5),
-                Check('HypercallTableHash', 50),
-                Check('HypercallTableWalk', 100),
+                Check('HypercallTableAddr', 18, 5),
+                Check('HypercallTableHash', 9, 50),
+                Check('HypercallTableWalk', 11, 100),
             ]
         ),
         CheckGroup(
             'GDT', [
-                Check('GDTR', 1),
-                Check('GdtHash', 50),
+                Check('GDTR', 3, 1),
+                Check('GdtHash', 19, 50),
             ]
         ),
         CheckGroup(
             'Kernel', [
-                Check('KernelAddr', 20),
-                Check('KernelHash', 500),
+                Check('KernelAddr', 15, 20),
+                Check('KernelHash', 4, 500),
             ]
         ),
         CheckGroup(
             'VmExit', [
-                Check('VmExitTableAddr', 1),
-                Check('VmExitTableHash', 5),
-                Check('VmExitTableWalk', 10),
+                Check('VmExitTableAddr', 5, 1),
+                Check('VmExitTableHash', 2, 5),
+                Check('VmExitTableWalk', 17, 10),
             ]
         ),
         CheckGroup(
             'CR0', [
-                Check('CR0Val', 1),
+                Check('CR0Val', 17, 1),
             ]
         ),
     ]

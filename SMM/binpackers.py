@@ -25,7 +25,7 @@ class DefaultBin:
         return b
 
     def requestBin(self, time, cpu_id):
-        return self.getBinKey(time, lambda x: x.getPriority())
+        return self.getBinKey(time, lambda x: -x.getPriority())
 
 class RandomBin(DefaultBin):
     def requestBin(self, time, cpu_id):
