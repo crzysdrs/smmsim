@@ -9,7 +9,9 @@ def timediff(conn):
     #Effectively means that an ephemeral attack that is shorter than the min
     # that occurs outside of the detection period will never be detected.
 
-    results = np.array([[0, 0, 0]])
+
+    results = []
+
     for task in conn.cursor().execute("SELECT * FROM task order by id;"):
         events = conn.cursor().execute("SELECT time as end from event WHERE task_id = ? order by time", (task['id'],) ).fetchall()
         if events:
@@ -19,12 +21,30 @@ def timediff(conn):
             diff = np.subtract(e, next_e)
             diff = np.delete(diff, 0, 0)
 
-            results = np.append(results, [[np.min(diff), np.max(diff), np.mean(diff)]], axis=0)
+            results.append( (task['name'], len(e), np.min(diff), np.max(diff), np.mean(diff)) )
         else:
-            results = np.append(results, [[0, 0, 0]], axis=0)
+            results.append( (task['name'], len(e), 0, 0, 0) )
 
-    results = np.delete(results, 0, 0)
     return results
+
+def cputime(conn):
+    c = conn.cursor()
+    r = c.execute("SELECT SUM(length) as total_bin_time FROM event WHERE bin_id not null").fetchall()
+    total_bin_time = r[0]['total_bin_time'];
+    r = c.execute("SELECT max(time) as max_time FROM event WHERE bin_id not null").fetchall()
+    last_time = r[0]['max_time']
+
+    return total_bin_time / last_time
+
+def bincount(conn):
+    c = conn.cursor()
+    r = c.execute("select count(bin_id) as bin_count from (select bin_id from event where bin_id not null group by bin_id)").fetchall()
+    return r[0]['bin_count']
+
+def miscdata(conn):
+    c = conn.cursor()
+    r = c.execute("select * from misc").fetchall()
+    return r
 
 def main():
     parser = argparse.ArgumentParser(description='Benchmark Enforcement Tool')
@@ -37,9 +57,16 @@ def main():
     conn = sqlite3.connect(args.db)
     conn.row_factory = sqlite3.Row
 
+    print ("\n".join(map(lambda x : "Misc Data {:>15}:{}".format(x['key'], x['val']), miscdata(conn))))
+    print ("Total Bins Run: {}".format(bincount(conn)))
     #if we had any firm failure cases, we could easily check that the
     # min/max/average met certain criteria.
-    print (timediff(conn))
+    print ("Time Betweeen Subsequent Repeated Task: count/min/max/avg (microseconds)")
+    times = timediff(conn)
+    for t in times:
+        print(("{:>50} {:>10}" + "{:>15.2f}" * 3).format(*t))
+
+    print ("SMM CPU Time Percentage: {}%".format(cputime(conn) * 100))
 
 if __name__ == "__main__":
     main()
