@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from SMM.scheduler import Task
+from scheduler import Task
 
 class DefaultTasks:
     def __init__(self):

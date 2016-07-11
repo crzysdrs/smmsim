@@ -7,6 +7,17 @@
 
 Intended to run simulations of various scheduling algorithms for SMM (System Management Mode) tasks. These tasks have been subdivided to be able to be run across multiple sessions of an SMI (System Management Interrupt). Given a simulation run result, a set of benchmarks will exist that will help judge a given scheduling algorithm.
 
+## Dependencies
+
+A few dependencies may be required depending on your setup.
+
+Ubuntu:
+
+```
+apt-get install pip3 python3-numpy
+pip3 install coverage
+```
+
 ## General Usage
 
 ### Simulator
