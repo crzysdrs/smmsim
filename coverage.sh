@@ -17,6 +17,8 @@ run_sim "10 --task_granularity 20 --bin_size 60 --smm_overhead 30"  ""
 
 run_sim "10 --cpus 4" ""
 
+run_sim "10 --binpacker LeastRecentBin" ""
+
 run_sim "10 --binpacker MaxFillBin" ""
 
 run_sim "10 --binpacker MaxPriorityBin"  ""

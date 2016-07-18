@@ -188,6 +188,7 @@ def main():
             logger.genericEvent(state.getTime(), cpu_id, "Bin Begin", 0, bin=b)
             for t in b.getTasks():
                 logger.taskEvent(state.getTime(), t, cpu_id, b)
+                t.run(state.getTime())
                 state.moveTime(t.getCost())
 
         logger.genericEvent(state.getTime(), cpu_id, "Bin End", 0, bin=b)

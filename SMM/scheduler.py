@@ -118,6 +118,7 @@ class Task:
         self.__subcheck = subcheck
         self.__index = index
         self.__cost = cost
+        self.__lastTime = 0
 
     def getCost(self):
         return self.__cost
@@ -127,6 +128,14 @@ class Task:
 
     def getCheck(self):
         return self.__subcheck
+
+    def lastTimeRun(self):
+        return self.__lastTime
+
+    def run(self, time):
+        #This is the last time it finished. Prevents long tasks from always
+        # thinking they haven't run in a long time.
+        self.__lastTime = time + self.getCost()
 
     def __str__(self):
         return "Task {}.{}".format(self.__subcheck, self.__index)

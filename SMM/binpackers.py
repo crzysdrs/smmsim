@@ -33,6 +33,10 @@ class RandomBin(DefaultBin):
     def requestBin(self, state, cpu_id):
         return self.getBinKey(state, lambda *args : random.random())
 
+class LeastRecentBin(DefaultBin):
+    def requestBin(self, state, cpu_id):
+        return self.getBinKey(state, lambda x : x.lastTimeRun())
+
 class FillBin(DefaultBin):
     def requestFillBin(self, criteria, state):
         def fillBin(criteria, best, space, i, choices):
