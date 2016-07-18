@@ -59,7 +59,6 @@ class SchedulerState:
             self.__logger.addTask(self.getTime(), t)
 
         self.__tasks += new_tasks
-        print (self.__tasks)
 
     def removeCheck(self, check):
         self.__logger.genericEvent(self.__time, None, "Removed Check {}".format(check), 0)
