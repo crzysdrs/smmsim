@@ -2,21 +2,26 @@
 
 SMM_SIM=./SMM/simulator.py
 SMM_BENCH=./SMM/benchmarks.py
+WORKLOAD=./SMM/workload.py
+
 COV_RUN="coverage run --parallel-mode --source=SMM"
 
 coverage erase
 
-$COV_RUN $SMM_SIM 10 || exit 1
+function run_sim {
+    $COV_RUN $WORKLOAD $1 tmp.workload || exit 1
+    $COV_RUN $SMM_SIM $2 tmp.workload || exit 1
+}
 
-$COV_RUN $SMM_SIM 10 --task_granularity 20 --bin_size 60 --smm_overhead 30 || exit 1
+run_sim "10 --task_granularity 20 --bin_size 60 --smm_overhead 30"  ""
 
-$COV_RUN $SMM_SIM 10 --cpus 4 || exit 1
+run_sim "10 --cpus 4" ""
 
-$COV_RUN $SMM_SIM 10 --binpacker MaxFillBin || exit 1
+run_sim "10 --binpacker MaxFillBin" ""
 
-$COV_RUN $SMM_SIM 10 --binpacker MaxPriorityBin || exit 1
+run_sim "10 --binpacker MaxPriorityBin"  ""
 
-$COV_RUN $SMM_SIM 10 --binpacker RandomBin --sqllog random.db || exit 1
+run_sim "10 --binpacker RandomBin" "--sqllog random.db"
 
 $COV_RUN $SMM_BENCH random.db || exit 1
 

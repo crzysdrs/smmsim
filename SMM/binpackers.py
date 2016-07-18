@@ -3,20 +3,22 @@ import random
 from scheduler import Bin
 
 class DefaultBin:
-    def __init__(self, tasks, binsize):
-        self._tasks = tasks
+    def __init__(self):
         self._queue = []
-        self._binsize = binsize
 
-    def getBinKey(self, time, f):
+    def getBinKey(self, state, f):
         b = Bin()
-        while b.getCost() < self._binsize:
+
+        if len(state.getTasks()) == 0:
+            return b
+
+        while b.getCost() < state.getVar('binsize'):
             if len(self._queue) == 0:
-                self._queue = (self._tasks)
+                self._queue = list(state.getTasks())
                 self._queue = sorted(self._queue, key=f)
 
             front = self._queue[0]
-            if front.getCost() + b.getCost() <= self._binsize:
+            if front.getCost() + b.getCost() <= state.getVar('binsize'):
                 b.addTask(front)
             else:
                 return b
@@ -24,15 +26,15 @@ class DefaultBin:
 
         return b
 
-    def requestBin(self, time, cpu_id):
-        return self.getBinKey(time, lambda x: -x.getPriority())
+    def requestBin(self, state, cpu_id):
+        return self.getBinKey(state, lambda x: -x.getPriority())
 
 class RandomBin(DefaultBin):
-    def requestBin(self, time, cpu_id):
-        return self.getBinKey(time, lambda *args : random.random())
+    def requestBin(self, state, cpu_id):
+        return self.getBinKey(state, lambda *args : random.random())
 
 class FillBin(DefaultBin):
-    def requestFillBin(self, criteria, time):
+    def requestFillBin(self, criteria, state):
         def fillBin(criteria, best, space, i, choices):
             if space <= 0 or i < 0:
                 return (0, None)
@@ -50,14 +52,14 @@ class FillBin(DefaultBin):
 
         b = Bin()
 
-        while sum(map(lambda x : x.getCost(), self._queue)) < self._binsize:
-            self._queue += self._tasks
+        while sum(map(lambda x : x.getCost(), self._queue)) < state.getVar('binsize') and len(state.getTasks()) > 0:
+            self._queue += state.getTasks()
 
-        best = [[None for y in range(len(self._queue))] for x in range(self._binsize + 1)]
+        best = [[None for y in range(len(self._queue))] for x in range(state.getVar('binsize') + 1)]
 
-        fillBin(criteria, best, self._binsize, len(self._queue) - 1, self._queue)
+        fillBin(criteria, best, state.getVar('binsize'), len(self._queue) - 1, self._queue)
 
-        space = self._binsize
+        space = state.getVar('binsize')
 
         i = len(self._queue) - 1
         while space >= 0 and i >= 0:
@@ -78,9 +80,9 @@ class FillBin(DefaultBin):
         return b
 
 class MaxFillBin(FillBin):
-    def requestBin(self, time, cpu_id):
-        return self.requestFillBin(lambda x : x.getCost(), time)
+    def requestBin(self, state, cpu_id):
+        return self.requestFillBin(lambda x : x.getCost(), state)
 
 class MaxPriorityBin(FillBin):
-    def requestBin(self, time, cpu_id):
-        return self.requestFillBin(lambda x : x.getPriority(), time)
+    def requestBin(self, state, cpu_id):
+        return self.requestFillBin(lambda x : x.getPriority(), state)

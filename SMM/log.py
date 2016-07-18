@@ -18,6 +18,9 @@ class SimLog(object):
         else:
             bin_id = 0
 
+        if cpu is None:
+            cpu = 0
+
         print("{:020d}: Proc {:04d}: Bin {:08d} Event:{} Length:{}".format(time, cpu, bin_id, event, length))
 
     def taskEvent(self, time, task, cpu, bin):

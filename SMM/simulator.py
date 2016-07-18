@@ -1,59 +1,155 @@
 #!/usr/bin/env python3
 
-from scheduler import CheckGroup, Check, Task, Bin, getChecks
+from scheduler import CheckGroup, Check, Task, Bin, getChecks, getBinPackers, getCheckSplitters, get_git_revision_hash
 import binpackers
 import checksplitters
 import argparse
 import log
-import sys, inspect
-import subprocess
+import sys
+import json
+
 from time import gmtime, strftime
 
-def get_git_revision_hash():
-    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).rstrip()
+class SchedulerState:
+    def __init__(self, logger):
+        self.__state =  {
+            'taskgran':0,
+            'smmpersecond':0,
+            'smmoverhead':0,
+            'binsize':0,
+            'binpacker':'',
+            'cpus':0,
+            'checksplitter':'',
+            'endsim':0
+        }
+        self.__checksplitter = None
+        self.__binpacker = None
+        self.__logger = logger
+        self.__checks = {}
+        self.__tasks = []
+        self.__time = 0
 
-def classmembers(module):
-    return inspect.getmembers(sys.modules[module], inspect.isclass)
+    def getTime(self):
+        return self.__time
+
+    def moveTime(self, t):
+        self.__time += t
+
+    def getTasks(self):
+        return self.__tasks
+
+    def findCheck(self, parent_name, name):
+        parent = self.__checks.get(parent_name)
+        if parent is None:
+            return None
+
+        return parent.getCheck(name)
+
+    def addCheck(self, group, new_check):
+        if group in self.__checks:
+            parent = self.__checks[group]
+        else:
+            parent = CheckGroup(group, [])
+            self.__checks[group] = parent
+
+        parent.addSubCheck(new_check)
+        new_tasks = self.__checksplitter.splitChecks(new_check, self.__state['taskgran'])
+
+        for t in new_tasks:
+            self.__logger.addTask(self.getTime(), t)
+
+        self.__tasks += new_tasks
+        print (self.__tasks)
+
+    def removeCheck(self, check):
+        self.__logger.genericEvent(self.__time, None, "Removed Check {}".format(check), 0)
+        self.__tasks = filter(lambda t: t.getCheck() != check, self.__tasks)
+        check.getGroup().removeSubCheck(check.getName())
+
+    def updateVar(self, k, v):
+        self.__logger.genericEvent(self.__time, None, "Changed Var {} to {}".format(k, v), 0)
+        self.__state[k] = v
+        if k == 'binpacker':
+            binpackers = getBinPackers()
+            self.__binpacker = binpackers[v]()
+        elif k == 'checksplitter':
+            checksplitters = getCheckSplitters()
+            self.__checksplitter = checksplitters[v]()
+
+    def getVar(self, k):
+        return self.__state[k]
+
+    def getPacker(self):
+        return self.__binpacker
+
+    def getSplitter(self):
+        return self.__splitter
+
+    def getLogger(self):
+        return self.__logger
+
+    def getCheckGroups(self):
+        return self.__checks
+
+class RunWorkload:
+    def __init__(self, state, w):
+        self.__state = state
+        self.__w = w
+        self.__cmds = {
+            'newcheck':lambda msg : self.createCheck(msg['data']),
+            'removecheck':lambda msg : self.removeCheck(msg['data']),
+            'changevars':lambda msg : self.changeVars(msg['data']),
+        }
+        self.__eventid = 0
+        self.__state.updateVar('endsim', w['endsim'])
+
+    def createCheck(self, checks):
+        for c in checks:
+            new = Check(c['name'], c['priority'], c['cost'])
+            self.__state.addCheck(c['group'], new)
+
+    def removeCheck(self, checks):
+        for c in checks:
+            found = self.__state.findCheck(c['group'], c['name'])
+            if found:
+                self.__state.removeCheck(found)
+            else:
+                self.__state.getLogger().error(self.__state.getTime(), "Can't find check {}.{}".format(c['group'], c['name']))
+
+    def changeVars(self, vars):
+        for k,v in vars.items():
+            self.__state.updateVar(k, v)
+
+    def updateWorkload(self):
+        time = self.__state.getTime()
+        eol = lambda : not (self.__eventid < len(self.__w['events']))
+
+        if eol():
+            return
+
+        e = self.__w['events'][self.__eventid]
+        while not eol() and time >= e['time']:
+            if e['action'] in self.__cmds:
+                self.__cmds[e['action']](e)
+            else:
+                print("Unknown command {}".format(e['action']))
+            self.__eventid += 1
+            if eol():
+                e = None
+            else:
+                e = self.__w['events'][self.__eventid]
+
 
 def main():
-    binpackers = classmembers("binpackers")
-    binpackers = filter(lambda x : 'requestBin' in x[1].__dict__, binpackers)
-    binpackers = dict(binpackers)
+    parser = argparse.ArgumentParser(description='Simulate an SMM Scheduler')
 
-    checksplitters = classmembers("checksplitters")
-    checksplitters = filter(lambda x : 'splitChecks' in x[1].__dict__, checksplitters)
-    checksplitters = dict(checksplitters)
-
-
-    parser = argparse.ArgumentParser(description='Simulator an SMM Scheduler')
-    parser.add_argument('--task_granularity', dest='granularity', type=int,
-                        default=50,  help='Max size of tasks (microseconds).')
-    parser.add_argument('--smm_per_second', dest='smm_per_sec',
-                        default=10,  type=int, help='SMM Actions to Run Per Second.')
-    parser.add_argument('--bin_size', dest='bin_size',
-                        default=100, type=int, help='SMM Bin Size (microseconds).')
-    parser.add_argument('--smm_overhead', dest='smm_cost', type=int,
-                        default=70,  help='Overhead of invoking SMM (microseconds).')
-    parser.add_argument('sim_length', type=int,
-                        help='Length of Simulation (seconds).')
-    parser.add_argument('--binpacker', choices=binpackers.keys(),
-                        default="DefaultBin",
-                        help='The BinPacker class that wille be used to fill bins.')
-    parser.add_argument('--cpus', type=int,
-                        default=1,
-                        help='Number of CPUs')
-    parser.add_argument('--checksplitter', choices=checksplitters.keys(),
-                        default="DefaultTasks",
-                        help='The class that will convert checks into tasks.')
+    parser.add_argument('workload', type=str,
+                        help='Specify the workload to run.')
     parser.add_argument('--sqllog', type=str,
                         default="",
                         help='Desired Location of sqlite log (WILL OVERWRITE).')
 
     args = parser.parse_args()
-
-    checks = getChecks()
-    splitter = checksplitters[args.checksplitter]()
-    tasks = splitter.splitChecks(checks, args.granularity)
 
     if args.sqllog != "":
         logger = log.SqliteLog(args.sqllog)
@@ -66,44 +162,44 @@ def main():
         'ver':get_git_revision_hash(),
         'args': " ".join(map(lambda x : '"{}"'.format(x), sys.argv))
     }
+    #all times are in microseconds
+    one_second = int(10**6)
+    next_time = 0
 
     for k,v in misc.items():
         logger.addMisc(k, v)
 
-    for t in tasks:
-        logger.addTask(0, t)
+    w = json.load(open(args.workload))
+    state = SchedulerState(logger)
+    workload = RunWorkload(state, w)
 
-    #all times are in microseconds
-    one_second = int(10**6)
-    time = 0
-    packer = binpackers[args.binpacker](tasks, args.bin_size)
-    next_time = 0
-    target_time = one_second * args.sim_length
-
-    cpu_id = 0
-
-    while time < target_time:
-        next_time = time + one_second//args.smm_per_sec
+    workload.updateWorkload() #Updates all the time zero events
+    while state.getTime() < state.getVar('endsim'):
+        workload.updateWorkload()
+        next_time = state.getTime() + one_second//state.getVar('smmpersecond')
         bins = []
-        for cpu_id in range(args.cpus):
-            bins.append(packer.requestBin(time, cpu_id))
-            logger.genericEvent(time, cpu_id, "SMI", args.smm_cost)
+        cpu_count = state.getVar('cpus')
+        for cpu_id in range(cpu_count):
+            bins.append(state.getPacker().requestBin(state, cpu_id))
+            logger.genericEvent(state.getTime(), cpu_id, "SMI", state.getVar('smmoverhead'))
 
-        time += args.smm_cost
+        state.moveTime(state.getVar('smmoverhead'))
 
-        for b, cpu_id in zip(bins, range(args.cpus)):
-            logger.genericEvent(time, cpu_id, "Bin Begin", 0, bin=b)
+        for b, cpu_id in zip(bins, range(cpu_count)):
+            logger.genericEvent(state.getTime(), cpu_id, "Bin Begin", 0, bin=b)
             for t in b.getTasks():
-                logger.taskEvent(time, t, cpu_id, b)
-                time += t.getCost()
+                logger.taskEvent(state.getTime(), t, cpu_id, b)
+                state.moveTime(t.getCost())
 
-        logger.genericEvent(time, cpu_id, "Bin End", 0, bin=b)
+        logger.genericEvent(state.getTime(), cpu_id, "Bin End", 0, bin=b)
 
         #Assumes that overlapping bins will wait until previous bin finishes
-        if next_time > time:
-            time = next_time
+        if next_time > state.getTime():
+            state.moveTime(next_time - state.getTime())
         else:
-            logger.warning(time, "Current Bin Will not terminate before next Bin is scheduled")
+            logger.warning(state.getTime(), "Current Bin Will not terminate before next Bin is scheduled")
+
+    workload.updateWorkload() #Finish up any lingering events
 
     misc = {
         'end_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),
