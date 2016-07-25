@@ -13,6 +13,12 @@ function run_sim {
     $COV_RUN $SMM_SIM $2 tmp.workload || exit 1
 }
 
+function run_sim2 {
+    $COV_RUN $WORKLOAD $1 tmp.workload || exit 1
+    cat tmp.workload | $COV_RUN $SMM_SIM $2 - || exit 1
+
+}
+
 run_sim "10 --task_granularity 20 --bin_size 60 --smm_overhead 30"  ""
 
 run_sim "10 --cpus 4" ""
@@ -22,6 +28,8 @@ run_sim "10 --binpacker LeastRecentBin" ""
 run_sim "10 --binpacker MaxFillBin" ""
 
 run_sim "10 --binpacker MaxPriorityBin"  ""
+
+run_sim2 "10 --binpacker RandomBin" ""
 
 run_sim "10 --binpacker RandomBin" "--sqllog random.db"
 
