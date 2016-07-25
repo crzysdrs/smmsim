@@ -5,14 +5,16 @@ import json
 import argparse
 
 class Workload:
-    def __init__(self, endsim):
-        self.__endsim = endsim
+    def __init__(self):
         self.__events = []
         self.__time = 0
 
     def timeForward(self, n):
         assert(n >= 0)
         self.__time += n
+
+    def getTime(self):
+        return self.__time
 
     def createCheck(self, c):
         self.__events.append(
@@ -32,6 +34,14 @@ class Workload:
             }
         )
 
+    def endSim(self):
+        self.__events.append(
+            {
+                'time':self.__time,
+                'action':'endsim',
+            }
+        )
+
     def changeVars(self, vars):
         self.__events.append(
             {
@@ -41,11 +51,10 @@ class Workload:
             }
         )
 
-    def getWorkload(self):
-        return {
-            'endsim':self.__endsim,
-            'events':self.__events
-        }
+    def writeWorkload(self, file_path):
+        with open(file_path, 'w') as f:
+            for e in self.__events:
+                f.write(json.dumps(e))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create a workload for an SMM Scheduler Simulator')
@@ -55,7 +64,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    w = Workload(args.sim_length * 10**6)
+    w = Workload()
 
     w.changeVars(
         {
@@ -77,5 +86,10 @@ if __name__ == "__main__":
     for c in scheduler.getChecks():
         w.removeCheck(c)
 
-    with open(args.file, 'w') as f:
-        f.write(json.dumps(w.getWorkload()))
+    endtime = args.sim_length * 10**6
+    if endtime < w.getTime():
+        w.moveTimeForward(endtime - w.getTime())
+
+    w.endSim()
+
+    w.writeWorkload(args.file)

@@ -7,20 +7,19 @@ import argparse
 import log
 import sys
 import json
-
+from functools import partial
 from time import gmtime, strftime
 
 class SchedulerState:
     def __init__(self, logger):
         self.__state =  {
-            'taskgran':0,
-            'smmpersecond':0,
-            'smmoverhead':0,
-            'binsize':0,
-            'binpacker':'',
-            'cpus':0,
-            'checksplitter':'',
-            'endsim':0
+            'taskgran':50,
+            'smmpersecond':10,
+            'smmoverhead':70,
+            'binsize':100,
+            'binpacker':'DefaultBin',
+            'cpus':1,
+            'checksplitter':'DefaultTasks'
         }
         self.__checksplitter = None
         self.__binpacker = None
@@ -28,6 +27,13 @@ class SchedulerState:
         self.__checks = {}
         self.__tasks = []
         self.__time = 0
+        self.__done = False
+
+        for k, v in self.__state.items():
+            self.__updateVarState(k, v)
+
+    def simRunning(self):
+        return not self.__done
 
     def getTime(self):
         return self.__time
@@ -60,20 +66,26 @@ class SchedulerState:
 
         self.__tasks += new_tasks
 
-    def removeCheck(self, check):
-        self.__logger.genericEvent(self.__time, None, "Removed Check {}".format(check), 0)
-        self.__tasks = filter(lambda t: t.getCheck() != check, self.__tasks)
-        check.getGroup().removeSubCheck(check.getName())
-
-    def updateVar(self, k, v):
-        self.__logger.genericEvent(self.__time, None, "Changed Var {} to {}".format(k, v), 0)
-        self.__state[k] = v
+    def __updateVarState(self, k, v):
         if k == 'binpacker':
             binpackers = getBinPackers()
             self.__binpacker = binpackers[v]()
         elif k == 'checksplitter':
             checksplitters = getCheckSplitters()
             self.__checksplitter = checksplitters[v]()
+
+    def removeCheck(self, check):
+        self.__logger.genericEvent(self.__time, None, "Removed Check {}".format(check), 0)
+        self.__tasks = list(filter(lambda t: t.getCheck() != check, self.__tasks))
+        check.getGroup().removeSubCheck(check.getName())
+
+    def updateVar(self, k, v):
+        self.__logger.genericEvent(self.__time, None, "Changed Var {} to {}".format(k, v), 0)
+        self.__state[k] = v
+        self.__updateVarState(k, v)
+
+    def endSim(self):
+        self.__done = True
 
     def getVar(self, k):
         return self.__state[k]
@@ -91,16 +103,45 @@ class SchedulerState:
         return self.__checks
 
 class RunWorkload:
-    def __init__(self, state, w):
+    def __init__(self, state, stream, interactive):
+        def parse_json_stream(stream_name):
+            if stream_name == '-':
+                stream = sys.stdin
+            else:
+                stream = open(stream_name)
+
+            if stream_name == '-' and interactive:
+                read = partial(stream.readline)
+            else:
+                chunksize = 1024
+                read = partial(stream.read, chunksize)
+            buffer = ""
+            decoder = json.JSONDecoder()
+            for chunk in iter(read, ''):
+                if interactive:
+                    buffer = chunk
+                else:
+                    buffer += chunk
+                while buffer:
+                    try:
+                        obj, idx = decoder.raw_decode(buffer)
+                        yield obj
+                        buffer = buffer[idx:].rstrip()
+                    except ValueError as e:
+                        if interactive:
+                            print(e)
+                        #Needs more input
+                        break
+
         self.__state = state
-        self.__w = w
         self.__cmds = {
             'newcheck':lambda msg : self.createCheck(msg['data']),
             'removecheck':lambda msg : self.removeCheck(msg['data']),
             'changevars':lambda msg : self.changeVars(msg['data']),
+            'endsim':lambda msg : self.__state.endSim(),
         }
-        self.__eventid = 0
-        self.__state.updateVar('endsim', w['endsim'])
+        self.__events = parse_json_stream(stream)
+        self.__nextEvent = None
 
     def createCheck(self, checks):
         for c in checks:
@@ -120,24 +161,37 @@ class RunWorkload:
             self.__state.updateVar(k, v)
 
     def updateWorkload(self):
-        time = self.__state.getTime()
-        eol = lambda : not (self.__eventid < len(self.__w['events']))
+        def getNextEvent():
+            valid = False
+            e = None
+            while e is None:
+                e = next(self.__events)
+                if 'time' not in e:
+                    print("Error: Missing 'time' field")
+                    e = None
+            return e
 
-        if eol():
+        if not self.__state.simRunning():
             return
 
-        e = self.__w['events'][self.__eventid]
-        while not eol() and time >= e['time']:
-            if e['action'] in self.__cmds:
-                self.__cmds[e['action']](e)
-            else:
-                print("Unknown command {}".format(e['action']))
-            self.__eventid += 1
-            if eol():
-                e = None
-            else:
-                e = self.__w['events'][self.__eventid]
+        try:
+            time = self.__state.getTime()
+            if self.__nextEvent is None:
+                self.__nextEvent = getNextEvent()
 
+            while time >= self.__nextEvent['time']:
+                e = self.__nextEvent
+                try:
+                    if e['action'] in self.__cmds:
+                        self.__cmds[e['action']](e)
+                    else:
+                        print("Unknown command {}".format(e['action']))
+                except:
+                    print("Malformed Command", self.__nextEvent)
+
+                self.__nextEvent = getNextEvent()
+        except StopIteration:
+            self.__state.endSim()
 
 def main():
     parser = argparse.ArgumentParser(description='Simulate an SMM Scheduler')
@@ -147,7 +201,10 @@ def main():
     parser.add_argument('--sqllog', type=str,
                         default="",
                         help='Desired Location of sqlite log (WILL OVERWRITE).')
-
+    parser.add_argument('--interactive',
+                        default=False,
+                        action='store_true',
+                        help='Want to run interactively.')
     args = parser.parse_args()
 
     if args.sqllog != "":
@@ -168,12 +225,11 @@ def main():
     for k,v in misc.items():
         logger.addMisc(k, v)
 
-    w = json.load(open(args.workload))
     state = SchedulerState(logger)
-    workload = RunWorkload(state, w)
+    workload = RunWorkload(state, args.workload, args.interactive)
 
     workload.updateWorkload() #Updates all the time zero events
-    while state.getTime() < state.getVar('endsim'):
+    while state.simRunning():
         workload.updateWorkload()
         next_time = state.getTime() + one_second//state.getVar('smmpersecond')
         bins = []
