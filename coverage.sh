@@ -29,6 +29,8 @@ run_sim "10 --binpacker MaxFillBin" ""
 
 run_sim "10 --binpacker MaxPriorityBin"  ""
 
+run_sim "10 --binpacker LPBinPack"  ""
+
 run_sim2 "10 --binpacker RandomBin" ""
 
 run_sim "10 --binpacker RandomBin" "--sqllog random.db"

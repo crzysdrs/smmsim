@@ -90,3 +90,111 @@ class MaxFillBin(FillBin):
 class MaxPriorityBin(FillBin):
     def requestBin(self, state, cpu_id):
         return self.requestFillBin(lambda x : x.getPriority(), state)
+
+class BinQueue(DefaultBin):
+    def __init__(self):
+        super().__init__()
+        self._binqueue = []
+
+    def _requestBin(self, state, cpu_id):
+        if len(self._binqueue) == 0:
+            self.computeBins(state, cpu_id)
+
+        if len(self._binqueue) == 0:
+            #must be no remaining tasks
+            return Bin()
+        else:
+            front = self._binqueue[0]
+            self._binqueue = self._binqueue[1:]
+            return front
+
+class FirstFit(BinQueue):
+    def requestBin(self, state, cpu_id):
+        return super()._requestBin(state, cpu_id)
+
+class LPBinPack(BinQueue):
+    def computeBins(self, state, cpu_id):
+        import pulp
+        import time
+
+        #https://www.linkedin.com/pulse/bin-packing-python-pulp-michael-basilyan
+        #This code modified from https://github.com/mbasilyan/binpacking/blob/master/binpacker.py
+        items = [(i, i.getCost()) for i in state.getTasks()]
+
+        itemCount = len(items)
+
+        # Max number of bins allowed.
+        maxBins = 32
+
+        # Bin Size
+        binCapacity = state.getVar("binsize")
+
+        # Indicator variable assigned 1 when the bin is used.
+        y = pulp.LpVariable.dicts('BinUsed', range(maxBins),
+                                  lowBound = 0,
+                                  upBound = 1,
+                                  cat = pulp.LpInteger)
+
+        # An indicator variable that is assigned 1 when item is placed into binNum
+        possible_ItemInBin = [(itemTuple[0], binNum) for itemTuple in items
+                              for binNum in range(maxBins)]
+        x = pulp.LpVariable.dicts('itemInBin', possible_ItemInBin,
+                                  lowBound = 0,
+                                  upBound = 1,
+                                  cat = pulp.LpInteger)
+
+        # Initialize the problem
+        prob = pulp.LpProblem("Bin Packing Problem", pulp.LpMinimize)
+
+        # Add the objective function.
+        prob += (
+            pulp.lpSum([y[i] for i in range(maxBins)]),
+            "Objective: Minimize Bins Used"
+        )
+
+        #
+        # This is the constraints section.
+        #
+
+        # First constraint: For every item, the sum of bins in which it appears must be 1
+        for j in items:
+            prob += (
+                pulp.lpSum([x[(j[0], i)] for i in range(maxBins)]) == 1,
+                ("An item can be in only 1 bin -- " + str(j[0]))
+            )
+
+        # Second constraint: For every bin, the number of items in the bin cannot exceed the bin capacity
+        for i in range(maxBins):
+            prob += (
+                pulp.lpSum([items[j][1] * x[(items[j][0], i)] for j in range(itemCount)]) <= binCapacity*y[i],
+                ("The sum of item sizes must be smaller than the bin -- " + str(i))
+            )
+
+        # Write the model to disk
+        #prob.writeLP("BinPack.lp")
+
+        # Solve the optimization.
+        start_time = time.time()
+        prob.solve()
+        print("Solved in %s seconds." % (time.time() - start_time))
+
+        # Bins used
+        bin_count = int(sum([y[i].value() for i in range(maxBins)]))
+        print("Bins used: {}".format(bin_count))
+
+        # The rest of this is some unpleasent massaging to get pretty results.
+        bins = {}
+
+        for itemBinPair in x.keys():
+            if(x[itemBinPair].value() == 1):
+                itemNum = itemBinPair[0]
+                binNum = itemBinPair[1]
+                if binNum not in bins:
+                    bins[binNum] = Bin()
+
+                bins[binNum].addTask(itemNum)
+
+        self._binqueue = list(bins.values())
+
+    def requestBin(self, state, cpu_id):
+        return super()._requestBin(state, cpu_id)

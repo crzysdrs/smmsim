@@ -24,5 +24,6 @@ setup(
     },
     install_requires=[
         'argparse',
+        'pulp',
     ]
 )
