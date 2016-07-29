@@ -51,9 +51,12 @@ class CheckGroup:
         return self.__name
 
     def removeSubCheck(self, name):
+        c = None
         if name in self.__subchecks:
+            c = self.__subchecks[name]
             del self.__subchecks[name]
 
+        return c
     def getData(self):
         j = []
         for s in self.__subchecks.values():

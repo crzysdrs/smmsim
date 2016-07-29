@@ -21,7 +21,7 @@ def timediff(conn):
 
             results.append( (task['name'], len(e), np.min(diff), np.max(diff), np.mean(diff)) )
         else:
-            results.append( (task['name'], len(e), 0, 0, 0) )
+            results.append( (task['name'], 0, 0, 0, 0) )
 
     return results
 

@@ -19,7 +19,8 @@ class SchedulerState:
             'binsize':100,
             'binpacker':'DefaultBin',
             'cpus':1,
-            'checksplitter':'DefaultTasks'
+            'checksplitter':'DefaultTasks',
+            'rantask':'reschedule',
         }
         self.__checksplitter = None
         self.__binpacker = None
@@ -32,6 +33,10 @@ class SchedulerState:
         for k, v in self.__state.items():
             self.__updateVarState(k, v)
 
+    def ranTask(self, task):
+        if self.getVar('rantask') == 'reschedule':
+            self.__binpacker.addTask(task)
+
     def simRunning(self):
         return not self.__done
 
@@ -40,9 +45,6 @@ class SchedulerState:
 
     def moveTime(self, t):
         self.__time += t
-
-    def getTasks(self):
-        return self.__tasks
 
     def findCheck(self, parent_name, name):
         parent = self.__checks.get(parent_name)
@@ -63,21 +65,25 @@ class SchedulerState:
 
         for t in new_tasks:
             self.__logger.addTask(self.getTime(), t)
-
-        self.__tasks += new_tasks
+            self.__binpacker.addTask(t)
 
     def __updateVarState(self, k, v):
         if k == 'binpacker':
             binpackers = getBinPackers()
+            old = self.__binpacker
             self.__binpacker = binpackers[v]()
+            if old is not None:
+                [self.__binpacker.addTask(x) for x in old.unusedTasks()]
         elif k == 'checksplitter':
             checksplitters = getCheckSplitters()
             self.__checksplitter = checksplitters[v]()
 
     def removeCheck(self, check):
         self.__logger.genericEvent(self.__time, None, "Removed Check {}".format(check), 0)
-        self.__tasks = list(filter(lambda t: t.getCheck() != check, self.__tasks))
-        check.getGroup().removeSubCheck(check.getName())
+
+        subcheck = check.getGroup().removeSubCheck(check.getName())
+        if subcheck:
+            self.__binpacker.removeSubCheck(subcheck)
 
     def updateVar(self, k, v):
         self.__logger.genericEvent(self.__time, None, "Changed Var {} to {}".format(k, v), 0)
@@ -186,8 +192,8 @@ class RunWorkload:
                         self.__cmds[e['action']](e)
                     else:
                         print("Unknown command {}".format(e['action']))
-                except:
-                    print("Malformed Command", self.__nextEvent)
+                except e:
+                    print("Malformed Command: {} {}".format(e, self.__nextEvent))
 
                 self.__nextEvent = getNextEvent()
         except StopIteration:
@@ -246,6 +252,7 @@ def main():
                 logger.taskEvent(state.getTime(), t, cpu_id, b)
                 t.run(state.getTime())
                 state.moveTime(t.getCost())
+                state.ranTask(t)
 
         logger.genericEvent(state.getTime(), cpu_id, "Bin End", 0, bin=b)
 

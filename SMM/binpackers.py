@@ -1,22 +1,38 @@
 #!/usr/bin/env
 import random
 from scheduler import Bin
+import functools
+
+#returns the rightmost insertion location
+def bisect(l, v, cmp=None):
+    if not cmp:
+        cmp = lambda x, y : 0 if x == y else (1 if x > y else -1)
+
+    low = 0
+    high = len(l)
+
+    while low < high:
+        mid = (high - low) // 2 + low
+        c = cmp(l[mid], v)
+        if c > 0:
+            high = mid
+        else:
+            low = mid + 1
+
+    return low
 
 class DefaultBin:
     def __init__(self):
         self._queue = []
+        self._cmp = lambda x: -x.getPriority()
 
     def getBinKey(self, state, f):
         b = Bin()
 
-        if len(state.getTasks()) == 0:
+        if len(self._queue) == 0:
             return b
 
-        while b.getCost() < state.getVar('binsize'):
-            if len(self._queue) == 0:
-                self._queue = list(state.getTasks())
-                self._queue = sorted(self._queue, key=f)
-
+        while b.getCost() < state.getVar('binsize') and len(self._queue) > 0:
             front = self._queue[0]
             if front.getCost() + b.getCost() <= state.getVar('binsize'):
                 b.addTask(front)
@@ -27,15 +43,33 @@ class DefaultBin:
         return b
 
     def requestBin(self, state, cpu_id):
-        return self.getBinKey(state, lambda x: -x.getPriority())
+        return self.getBinKey(state, self._cmp)
+
+    def addTask(self, task):
+        ix = bisect(self._queue, task, cmp=lambda x, y : self._cmp(x) - self._cmp(y))
+        self._queue.insert(ix, task)
+
+    def unusedTasks(self):
+        return self._queue
+
+    def removeSubCheck(self, subcheck):
+        self._queue = list(filter(lambda t:  t.getCheck() == subcheck, self._queue))
 
 class RandomBin(DefaultBin):
+    def __init__(self):
+        super().__init__()
+        self._cmp = lambda *args : random.random()
+
     def requestBin(self, state, cpu_id):
-        return self.getBinKey(state, lambda *args : random.random())
+        return super().requestBin(state, cpu_id)
 
 class LeastRecentBin(DefaultBin):
+    def __init__(self):
+        super().__init__()
+        self._cmp = lambda x : x.lastTimeRun()
+
     def requestBin(self, state, cpu_id):
-        return self.getBinKey(state, lambda x : x.lastTimeRun())
+        return super().requestBin(state, cpu_id)
 
 class FillBin(DefaultBin):
     def requestFillBin(self, criteria, state):
@@ -55,9 +89,6 @@ class FillBin(DefaultBin):
             return best[space][i]
 
         b = Bin()
-
-        while sum(map(lambda x : x.getCost(), self._queue)) < state.getVar('binsize') and len(state.getTasks()) > 0:
-            self._queue += state.getTasks()
 
         best = [[None for y in range(len(self._queue))] for x in range(state.getVar('binsize') + 1)]
 
@@ -108,6 +139,16 @@ class BinQueue(DefaultBin):
             self._binqueue = self._binqueue[1:]
             return front
 
+    def addTask(self, task):
+        self._queue.append(task)
+
+    def unusedTasks(self):
+        return functools.reduce(lambda x, y : x + y, [b.getTasks() for b in self._binqueue], []) + self._queue
+
+    def removeSubCheck(self, subcheck):
+        self._queue = list(filter(lambda t:  t.getCheck() == subcheck, self.unusedTasks()))
+        self._binqueue = []
+
 class FirstFit(BinQueue):
     def requestBin(self, state, cpu_id):
         return super()._requestBin(state, cpu_id)
@@ -119,8 +160,8 @@ class LPBinPack(BinQueue):
 
         #https://www.linkedin.com/pulse/bin-packing-python-pulp-michael-basilyan
         #This code modified from https://github.com/mbasilyan/binpacking/blob/master/binpacker.py
-        items = [(i, i.getCost()) for i in state.getTasks()]
-
+        items = [(i, i.getCost()) for i in self._queue]
+        print (items)
         itemCount = len(items)
 
         # Max number of bins allowed.
@@ -195,6 +236,7 @@ class LPBinPack(BinQueue):
                 bins[binNum].addTask(itemNum)
 
         self._binqueue = list(bins.values())
+        self._queue = []
 
     def requestBin(self, state, cpu_id):
         return super()._requestBin(state, cpu_id)
