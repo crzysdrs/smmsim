@@ -32,13 +32,19 @@ def cputime(conn):
     r = c.execute("SELECT max(time) as max_time FROM event WHERE bin_id not null").fetchall()
     last_time = r[0]['max_time']
 
-    return total_bin_time / last_time
+    if total_bin_time and last_time:
+        return total_bin_time / last_time
+    else:
+        return 0
 
 def bincount(conn):
     c = conn.cursor()
     r = c.execute("select sum(length) as bin_length from event where bin_id not null group by bin_id").fetchall()
     bindata = np.array(r)
-    return (len(bindata), np.min(bindata), np.max(bindata), np.mean(bindata) )
+    if len(bindata):
+        return (len(bindata), np.min(bindata), np.max(bindata), np.mean(bindata) )
+    else:
+        return (0, 0, 0, 0)
 
 def miscdata(conn):
     c = conn.cursor()

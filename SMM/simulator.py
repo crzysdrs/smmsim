@@ -130,9 +130,10 @@ class RunWorkload:
                     buffer += chunk
                 while buffer:
                     try:
+                        buffer = buffer.lstrip()
                         obj, idx = decoder.raw_decode(buffer)
                         yield obj
-                        buffer = buffer[idx:].rstrip()
+                        buffer = buffer[idx:]
                     except ValueError as e:
                         if interactive:
                             print(e)

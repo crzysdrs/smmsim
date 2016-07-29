@@ -54,7 +54,7 @@ class Workload:
     def writeWorkload(self, file_path):
         with open(file_path, 'w') as f:
             for e in self.__events:
-                f.write(json.dumps(e))
+                f.write(json.dumps(e, indent=4) + "\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create a workload for an SMM Scheduler Simulator')
