@@ -161,7 +161,6 @@ class LPBinPack(BinQueue):
         #https://www.linkedin.com/pulse/bin-packing-python-pulp-michael-basilyan
         #This code modified from https://github.com/mbasilyan/binpacking/blob/master/binpacker.py
         items = [(i, i.getCost()) for i in self._queue]
-        print (items)
         itemCount = len(items)
 
         # Max number of bins allowed.
