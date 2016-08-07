@@ -9,6 +9,8 @@ import sys
 import json
 from functools import partial
 from time import gmtime, strftime
+import schema
+import jsonschema
 
 class SchedulerState:
     def __init__(self, logger):
@@ -133,6 +135,7 @@ class RunWorkload:
                     try:
                         buffer = buffer.lstrip()
                         obj, idx = decoder.raw_decode(buffer)
+                        schema.validate(obj)
                         yield obj
                         buffer = buffer[idx:]
                     except ValueError as e:
@@ -140,12 +143,18 @@ class RunWorkload:
                             print(e)
                         #Needs more input
                         break
+                    except jsonschema.ValidationError as e:
+                        if interactive:
+                            print(e)
+                            break
+                        else:
+                            raise
 
         self.__state = state
         self.__cmds = {
-            'newcheck':lambda msg : self.createCheck(msg['data']),
-            'removecheck':lambda msg : self.removeCheck(msg['data']),
-            'changevars':lambda msg : self.changeVars(msg['data']),
+            'newcheck':lambda msg : self.createCheck(msg['checks']),
+            'removecheck':lambda msg : self.removeCheck(msg['checks']),
+            'changevars':lambda msg : self.changeVars(msg['vars']),
             'endsim':lambda msg : self.__state.endSim(),
         }
         self.__events = parse_json_stream(stream)
@@ -174,9 +183,6 @@ class RunWorkload:
             e = None
             while e is None:
                 e = next(self.__events)
-                if 'time' not in e:
-                    print("Error: Missing 'time' field")
-                    e = None
             return e
 
         if not self.__state.simRunning():
@@ -189,13 +195,8 @@ class RunWorkload:
 
             while time >= self.__nextEvent['time']:
                 e = self.__nextEvent
-                try:
-                    if e['action'] in self.__cmds:
-                        self.__cmds[e['action']](e)
-                    else:
-                        print("Unknown command {}".format(e['action']))
-                except e:
-                    print("Malformed Command: {} {}".format(e, self.__nextEvent))
+                if e['action'] in self.__cmds:
+                    self.__cmds[e['action']](e)
 
                 self.__nextEvent = getNextEvent()
         except StopIteration:

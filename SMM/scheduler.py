@@ -112,7 +112,7 @@ class Check:
             'name': self.__name,
             'cost': self.__cost,
             'priority' : self.__priority,
-            'attribs': {
+            'misc': {
             },
         }
 

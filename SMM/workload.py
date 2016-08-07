@@ -3,6 +3,7 @@
 import scheduler
 import json
 import argparse
+import schema
 
 class Workload:
     def __init__(self):
@@ -21,7 +22,7 @@ class Workload:
             {
                 'time':self.__time,
                 'action':'newcheck',
-                'data':c.getData()
+                'checks':c.getData()
             }
         )
 
@@ -30,7 +31,7 @@ class Workload:
             {
                 'time':self.__time,
                 'action':'removecheck',
-                'data':c.getData()
+                'checks':list(map(lambda c : {'name':c['name'], 'group':c['group']}, c.getData()))
             }
         )
 
@@ -47,13 +48,14 @@ class Workload:
             {
                 'time':self.__time,
                 'action':'changevars',
-                'data':vars
+                'vars':vars
             }
         )
 
     def writeWorkload(self, file_path):
         with open(file_path, 'w') as f:
             for e in self.__events:
+                schema.validate(e)
                 f.write(json.dumps(e, indent=4) + "\n")
 
 if __name__ == "__main__":
