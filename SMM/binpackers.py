@@ -55,6 +55,12 @@ class DefaultBin:
     def removeSubCheck(self, subcheck):
         self._queue = list(filter(lambda t:  t.getCheck() == subcheck, self._queue))
 
+class AgingBin(DefaultBin):
+    def requestBin(self, state, cpu_id):
+        b = super().requestBin(state, cpu_id)
+        [t.setPriority(t.getPriority() + 1) for t in self._queue]
+        return b
+
 class RandomBin(DefaultBin):
     def __init__(self):
         super().__init__()

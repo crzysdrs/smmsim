@@ -122,12 +122,19 @@ class Task:
         self.__index = index
         self.__cost = cost
         self.__lastTime = 0
+        self.__priority = self.__subcheck.getPriority()
+
+    def reset(self):
+        self.__prioirity = self.__subcheck.getPriority()
 
     def getCost(self):
         return self.__cost
 
     def getPriority(self):
-        return self.__subcheck.getPriority()
+        return self.__priority
+
+    def setPriority(self, p):
+        self.__priority = p
 
     def getCheck(self):
         return self.__subcheck

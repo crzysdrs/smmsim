@@ -37,5 +37,9 @@ run_sim "10 --binpacker RandomBin" "--sqllog random.db"
 
 $COV_RUN $SMM_BENCH random.db || exit 1
 
+run_sim "10 --binpacker AgingBin" "--sqllog aged.db"
+
+$COV_RUN $SMM_BENCH aged.db || exit 1
+
 coverage combine
 coverage report

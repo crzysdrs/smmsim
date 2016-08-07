@@ -35,6 +35,7 @@ class SchedulerState:
 
     def ranTask(self, task):
         if self.getVar('rantask') == 'reschedule':
+            task.reset()
             self.__binpacker.addTask(task)
 
     def simRunning(self):
