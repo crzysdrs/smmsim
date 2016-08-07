@@ -75,7 +75,7 @@ SCHEMA = {
         'properties':{
             'cost':{
                 'type':'integer',
-                'minimum':0,
+                'minimum':1,
             },
             'group':{
                 'type':'string'
