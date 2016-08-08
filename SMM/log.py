@@ -54,16 +54,16 @@ class SqliteLog(SimLog):
 
         c.execute("""
         CREATE TABLE event
-        (id auto increment, time int, cpu_id int, bin_id int, task_id int default null, generic_id default null, length int null);
+        (id integer primary key, time int, cpu_id int, bin_id int, task_id int default null, generic_id default null, length int null);
         """)
         c.execute("""
         CREATE TABLE task
-        (id int, name text);
+        (id integer primary key, name text);
         """
         )
         c.execute("""
         CREATE TABLE generic_event
-        (id int, name text);
+        (id int primary key, name text);
         """
         )
 
