@@ -5,7 +5,7 @@ SMM_BENCH=`which smmbench`
 WORKLOAD=`which smmgenwork`
 RANDWORKLOAD=`which smmrandwork`
 
-COV_RUN="coverage run --parallel-mode --omit=*/python?.?/*,/*/python?/*,*__init__* "
+COV_RUN="coverage run --parallel-mode --include=*/SMM/* --omit=*__init__*"
 
 if [[ ( ! -e "$SMM_SIM" ) || ( ! -e "$SMM_BENCH" ) || ( ! -e "$WORKLOAD" ) || ( ! -e "$RANDWORKLOAD" ) ]]; then
     echo "Missing one or more tools. Did you install the tool?"
