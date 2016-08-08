@@ -10,15 +10,15 @@ def classmembers(module):
     return inspect.getmembers(sys.modules[module], inspect.isclass)
 
 def getBinPackers():
-    import binpackers
-    binpackers = classmembers("binpackers")
+    import SMM.binpackers
+    binpackers = classmembers("SMM.binpackers")
     binpackers = filter(lambda x : 'requestBin' in x[1].__dict__, binpackers)
     binpackers = dict(binpackers)
     return binpackers
 
 def getCheckSplitters():
-    import checksplitters
-    checksplitters = classmembers("checksplitters")
+    import SMM.checksplitters
+    checksplitters = classmembers("SMM.checksplitters")
     checksplitters = filter(lambda x : 'splitChecks' in x[1].__dict__, checksplitters)
     checksplitters = dict(checksplitters)
     return checksplitters

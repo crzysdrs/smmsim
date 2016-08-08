@@ -1,4 +1,4 @@
-import scheduler
+from SMM import scheduler
 import jsonschema
 
 SCHEMA = {
@@ -60,7 +60,8 @@ SCHEMA = {
             'rantask':{
                 'type':'string',
                 'enum':[
-                    'reschedule'
+                    'reschedule',
+                    'discard',
                 ],
             },
             'checksplitter':{

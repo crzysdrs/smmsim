@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
-from scheduler import CheckGroup, Check, Task, Bin, getChecks, getBinPackers, getCheckSplitters, get_git_revision_hash
-import binpackers
-import checksplitters
+from SMM.scheduler import CheckGroup, Check, Task, Bin, getChecks, getBinPackers, getCheckSplitters, get_git_revision_hash
+from SMM import binpackers, checksplitters, log, schema
 import argparse
-import log
 import sys
 import json
 from functools import partial
 from time import gmtime, strftime
-import schema
 import jsonschema
 
 class SchedulerState:
@@ -39,6 +36,10 @@ class SchedulerState:
         if self.getVar('rantask') == 'reschedule':
             task.reset()
             self.__binpacker.addTask(task)
+        elif self.getVar('rantask') == 'discard':
+            pass
+        else:
+            self.logger.error("Unknwon rantask setting")
 
     def simRunning(self):
         return not self.__done
@@ -112,7 +113,7 @@ class SchedulerState:
         return self.__checks
 
 class RunWorkload:
-    def __init__(self, state, stream, interactive):
+    def __init__(self, state, stream, interactive, validate):
         def parse_json_stream(stream_name):
             if stream_name == '-':
                 stream = sys.stdin
@@ -135,7 +136,8 @@ class RunWorkload:
                     try:
                         buffer = buffer.lstrip()
                         obj, idx = decoder.raw_decode(buffer)
-                        schema.validate(obj)
+                        if validate:
+                            schema.validate(obj)
                         yield obj
                         buffer = buffer[idx:]
                     except ValueError as e:
@@ -214,12 +216,22 @@ def main():
                         default=False,
                         action='store_true',
                         help='Want to run interactively.')
+    parser.add_argument('--validate',
+                        default=False,
+                        action='store_true',
+                        help='Enable schema validator.')
+    parser.add_argument('--verbose',
+                        default=False,
+                        action='store_true',
+                        help='Enable logging output.')
+
+
     args = parser.parse_args()
 
     if args.sqllog != "":
-        logger = log.SqliteLog(args.sqllog)
+        logger = log.SqliteLog(args.verbose, args.sqllog)
     else:
-        logger = log.SimLog()
+        logger = log.SimLog(args.verbose)
 
     misc = {
         'start_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),
@@ -235,7 +247,7 @@ def main():
         logger.addMisc(k, v)
 
     state = SchedulerState(logger)
-    workload = RunWorkload(state, args.workload, args.interactive)
+    workload = RunWorkload(state, args.workload, args.interactive, args.validate)
 
     workload.updateWorkload() #Updates all the time zero events
     while state.simRunning():

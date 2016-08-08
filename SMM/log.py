@@ -3,14 +3,16 @@ import sqlite3
 import os
 
 class SimLog(object):
-    def __init__(self):
-        self._verbose = True
+    def __init__(self, verbose):
+        self._verbose = verbose
 
     def addMisc(self, key, val):
-        print("Misc: {}:{}".format(key, val))
+        if self._verbose:
+            print("Misc: {}:{}".format(key, val))
 
     def addTask(self, time, task):
-        print("{:020d}: Added Task {}".format(time, task))
+        if self._verbose:
+            print("{:020d}: Added Task {}".format(time, task))
 
     def genericEvent(self, time, cpu, event, length, bin=None):
         if bin is not None:
@@ -21,10 +23,12 @@ class SimLog(object):
         if cpu is None:
             cpu = 0
 
-        print("{:020d}: Proc {:04d}: Bin {:08d} Event:{} Length:{}".format(time, cpu, bin_id, event, length))
+        if self._verbose:
+            print("{:020d}: Proc {:04d}: Bin {:08d} Event:{} Length:{}".format(time, cpu, bin_id, event, length))
 
     def taskEvent(self, time, task, cpu, bin):
-        print("{:020d}: Proc {:04d}: Bin {:08d} Task {}".format(time, cpu, bin.getId(), task))
+        if self._verbose:
+            print("{:020d}: Proc {:04d}: Bin {:08d} Task {}".format(time, cpu, bin.getId(), task))
 
     def warning(self, time, msg):
         print("{:020d}: Warning {}".format(time, msg))
@@ -33,11 +37,11 @@ class SimLog(object):
         print("{:020d}: Error {}".format(time, msg))
 
     def endLog(self):
-        pass;
+        pass
 
 class SqliteLog(SimLog):
-    def __init__(self, location):
-        super().__init__()
+    def __init__(self, verbose, location):
+        super().__init__(verbose)
         self.__tasks = {}
         self.__events = {}
         self.__eventid = 0

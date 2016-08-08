@@ -1,6 +1,6 @@
 #!/usr/bin/env
 import random
-from scheduler import Bin
+from SMM.scheduler import Bin
 import functools
 
 #returns the rightmost insertion location

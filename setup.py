@@ -13,13 +13,12 @@ setup(
     scripts=[
     ],
     packages = find_packages(),
-    #package_dir={'': 'SMM'},
-    #py_modules=[
-    #    'SMM'
-    #],
     entry_points={
         'console_scripts': [
-            'smm_sim = SMM.simulator:main'
+            'smmsim = SMM.simulator:main',
+            'smmbench = SMM.benchmarks:main',
+            'smmgenwork = SMM.workload:genericWorkload',
+            'smmrandwork = SMM.workload:randWorkload',
         ],
     },
     install_requires=[
