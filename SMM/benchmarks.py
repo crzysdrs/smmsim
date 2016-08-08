@@ -25,7 +25,8 @@ def timediff(conn):
 
     return results
 
-def maxtime(c):
+def maxtime(conn):
+    c = conn.cursor()
     r = c.execute("SELECT max(time) as max_time FROM event WHERE bin_id not null").fetchall()
     last_time = r[0]['max_time']
     return last_time
@@ -34,18 +35,30 @@ def cputime(conn):
     c = conn.cursor()
     r = c.execute("SELECT SUM(length) as total_bin_time FROM event WHERE bin_id not null").fetchall()
     total_bin_time = r[0]['total_bin_time'];
-    last_time = maxtime(conn.cursor())
+    last_time = maxtime(conn)
 
     if total_bin_time and last_time:
         return total_bin_time / last_time
     else:
         return 0
 
+def totaltasks(conn):
+    c = conn.cursor()
+    r = c.execute("SELECT count(id) as total_tasks FROM event WHERE task_id not null").fetchall()
+    return r[0]['total_tasks']
+
 def throughput(conn):
     c = conn.cursor()
-    last_time = maxtime(conn.cursor())
+    last_time = maxtime(conn)
+    total_tasks = totaltasks(conn)
     r = c.execute("SELECT count(id) as total_tasks FROM event WHERE task_id not null").fetchall()
-    return r[0]['total_tasks'] / (last_time / (10**6))
+    return total_tasks / (last_time / (10**6))
+
+def throughputbin(conn):
+    c = conn.cursor()
+    bc = bincount(conn)
+    total_tasks = totaltasks(conn)
+    return total_tasks / bc[0]
 
 def bincount(conn):
     c = conn.cursor()
@@ -83,6 +96,7 @@ def main():
 
     print ("SMM CPU Time Percentage: {}%".format(cputime(conn) * 100))
     print ("Throughput {} tasks/second".format(throughput(conn)))
+    print ("Throughput {} tasks/bin".format(throughputbin(conn)))
 
 if __name__ == "__main__":
     main()
