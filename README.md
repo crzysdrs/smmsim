@@ -11,11 +11,12 @@ Intended to run simulations of various scheduling algorithms for SMM (System Man
 
 A few dependencies may be required depending on your setup.
 
-Ubuntu:
+Ubuntu Installation:
 
 ```
 apt-get install pip3 python3-numpy
 pip3 install coverage
+./setup.py develop --user
 ```
 
 ## General Usage
@@ -23,14 +24,14 @@ pip3 install coverage
 ### Simulator
 
 ```
-$ ./SMM/simulator.py 
-usage: simulator.py [-h] [--task_granularity GRANULARITY]
-                    [--smm_per_second SMM_PER_SEC] [--bin_size BIN_SIZE]
-                    [--smm_overhead SMM_COST]
-                    [--binpacker {DefaultBin,MaxPriorityBin,RandomBin,MaxFillBin}]
-                    [--cpus CPUS] [--checksplitter {DefaultTasks}]
-                    [--sqllog SQLLOG]
-                    sim_length
+$ smmsim 
+usage: smmsim [-h] [--task_granularity GRANULARITY]
+              [--smm_per_second SMM_PER_SEC] [--bin_size BIN_SIZE]
+              [--smm_overhead SMM_COST]
+              [--binpacker {DefaultBin,MaxPriorityBin,RandomBin,MaxFillBin}]
+              [--cpus CPUS] [--checksplitter {DefaultTasks}]
+              [--sqllog SQLLOG]
+              sim_length
 ```
 
 This gives a general means of running various simulations by adjusting the parameters associated with a given scheduler approach. It is easily extended to incorporate additional scheduling algorithms and tasks divisions. If the output is logged to a sqlite database file, it can be benchmarked to determine the efficacy of the scheduler.
@@ -38,8 +39,8 @@ This gives a general means of running various simulations by adjusting the param
 ### Benchmark Tool
 
 ```
-$ ./SMM/benchmarks.py
-usage: benchmarks.py [-h] db
+$ smmbench
+usage: smmbench [-h] db
 ```
 
 Given a sqlite database file, run the set of predetermined benchmarks to determine the efficacy of the scheduler.
