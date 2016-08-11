@@ -297,6 +297,8 @@ def main():
 
     workload.updateWorkload() #Finish up any lingering events
 
+    logger.timeEvent(state.getTime(), 0, "end_sim")
+
     misc = {
         'end_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),
         'end_local':strftime("%a, %d %b %Y %X +0000"),

@@ -19,6 +19,7 @@ setup(
             'smmbench = SMM.benchmarks:main',
             'smmgenwork = SMM.workload:genericWorkload',
             'smmrandwork = SMM.workload:randWorkload',
+            'smmvalidate = SMM.schema:validatestream',
         ],
     },
     install_requires=[

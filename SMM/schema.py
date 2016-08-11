@@ -180,3 +180,26 @@ SCHEMA = {
 
 def validate(e):
     jsonschema.validate(e, SCHEMA)
+
+def validatestream():
+    import sys
+    import json
+    import functools
+    stream = sys.stdin
+    chunksize = 1024
+    read = functools.partial(stream.read, chunksize)
+    buffer = ""
+    decoder = json.JSONDecoder()
+    for chunk in iter(read, ''):
+        buffer += chunk
+        while buffer:
+            try:
+                buffer = buffer.lstrip()
+                obj, idx = decoder.raw_decode(buffer)
+                validate(obj)
+                print(json.dumps(obj))
+                buffer = buffer[idx:]
+            except ValueError as e:
+                break
+            except jsonschema.ValidationError as e:
+                raise

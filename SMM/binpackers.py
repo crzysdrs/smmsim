@@ -168,6 +168,8 @@ class LPBinPack(BinQueue):
         #This code modified from https://github.com/mbasilyan/binpacking/blob/master/binpacker.py
         items = [(i, i.getCost()) for i in self._queue]
         itemCount = len(items)
+        if itemCount == 0:
+            return
 
         # Max number of bins allowed.
         maxBins = 32
@@ -222,11 +224,11 @@ class LPBinPack(BinQueue):
         # Solve the optimization.
         start_time = time.time()
         prob.solve()
-        print("Solved in %s seconds." % (time.time() - start_time))
+        #print("Solved in %s seconds." % (time.time() - start_time))
 
         # Bins used
         bin_count = int(sum([y[i].value() for i in range(maxBins)]))
-        print("Bins used: {}".format(bin_count))
+        #print("Bins used: {}".format(bin_count))
 
         # The rest of this is some unpleasent massaging to get pretty results.
         bins = {}
