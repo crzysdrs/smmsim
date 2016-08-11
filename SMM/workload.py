@@ -80,10 +80,14 @@ def randWorkload():
     parser.add_argument('file', type=str,
                         help='Specify the workload output file.')
 
+    parser.add_argument('--validate',
+                        default=False,
+                        action='store_true',
+                        help='Enable schema validator.')
 
     args = parser.parse_args()
 
-    w = Workload(False)
+    w = Workload(args.validate)
 
     w.changeVars(
         {
@@ -125,9 +129,14 @@ def genericWorkload():
     parser.add_argument('file', type=str,
                         help='Specify the workload output file.')
 
+    parser.add_argument('--validate',
+                        default=False,
+                        action='store_true',
+                        help='Enable schema validator.')
+
     args = parser.parse_args()
 
-    w = Workload(True)
+    w = Workload(args.validate)
 
     w.changeVars(
         {

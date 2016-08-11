@@ -30,12 +30,12 @@ function run_sim2 {
 }
 
 function run_sim3 {
-    $COV_RUN $WORKLOAD $1 tmp.workload || exit 1
+    $COV_RUN $WORKLOAD $1 tmp.workload --validate || exit 1
     $COV_RUN $SMM_SIM $2 --validate $VERBOSE tmp.workload || exit 1
 }
 
 function run_rand {
-    $COV_RUN $RANDWORKLOAD $1 tmp.workload || exit 1
+    $COV_RUN $RANDWORKLOAD $1 tmp.workload --validate || exit 1
     $COV_RUN $SMM_SIM $2 --validate $VERBOSE tmp.workload || exit 1
 }
 
