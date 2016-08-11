@@ -112,9 +112,6 @@ class SqliteLog(SimLog):
 
 
     def addTask(self, time, task):
-        if self._verbose:
-            super().addTask(time, task)
-
         i = self.__taskid
         self.__taskid += 1
 
@@ -128,10 +125,6 @@ class SqliteLog(SimLog):
 
     def removeTask(self, time, task):
         self.timeEvent(time, 0, "rm_task", task=task)
-
-        if self._verbose:
-            super().removeTask(time, task)
-
         del self.__tasks[task]
 
     def timeEvent(self, time, length, event, task=None, cpu=None, bin=None, msg=None):
