@@ -8,6 +8,7 @@ import json
 from functools import partial
 from time import gmtime, strftime
 import jsonschema
+import numpy as np
 
 class SchedulerState:
     def __init__(self, logger):
@@ -50,6 +51,7 @@ class SchedulerState:
         return self.__time
 
     def moveTime(self, t):
+        assert(t >= 0)
         self.__time += t
 
     def findCheck(self, parent_name, name):
@@ -265,15 +267,27 @@ def main():
 
         state.moveTime(state.getVar('smmoverhead'))
 
+        planned_tasks = []
+        for b, cpu_id in zip(bins, range(cpu_count)):
+            start_times = map(int, np.cumsum([0] + [t.getCost() for t in b.getTasks()]))
+            tasks = b.getTasks() + [None]
+            all_tasks = [(t, s, b, cpu_id) for (t,s) in zip(tasks, start_times)]
+            planned_tasks += all_tasks
+
+        planned_tasks = sorted(planned_tasks, key=lambda t : t[1])
+
         for b, cpu_id in zip(bins, range(cpu_count)):
             logger.timeEvent(state.getTime(), 0, "bin_start", cpu=cpu_id, bin=b)
-            for t in b.getTasks():
+
+        time = state.getTime()
+        for (t, start_time, b, cpu_id) in planned_tasks:
+            state.moveTime(time + start_time - state.getTime())
+            if t is None:
+                logger.timeEvent(state.getTime(), 0, "bin_end", cpu=cpu_id, bin=b)
+            else:
                 logger.timeEvent(state.getTime(), t.getCost(), "run_task", task=t, cpu=cpu_id, bin=b)
                 t.run(state.getTime())
-                state.moveTime(t.getCost())
                 state.ranTask(state.getTime(), t)
-
-        logger.timeEvent(state.getTime(), 0, "bin_end", cpu=cpu_id, bin=b)
 
         #Assumes that overlapping bins will wait until previous bin finishes
         if next_time > state.getTime():

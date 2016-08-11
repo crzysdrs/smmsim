@@ -22,6 +22,7 @@ def responsetime(conn):
     print ("Tasks Finished {} Tasks Remaining {}".format(len(finished), len(nofinish)))
     runtimes = np.transpose(finished)
     (start, finish) = np.split(runtimes, 2)
+
     actual = np.subtract(finish, start)
     print ("Response Times for Tasks (microseconds):\n Min {} Mean {} Max {}".format(np.min(actual), np.mean(actual), np.max(actual)))
     return actual

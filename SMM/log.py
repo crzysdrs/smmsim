@@ -75,12 +75,12 @@ class SqliteLog(SimLog):
         CREATE TABLE event
         (
             id integer primary key,
-            time int,
+            time integer,
             type_id default null,
-            cpu_id int default null,
-            bin_id int default null,
-            task_id int default null,
-            length int default null,
+            cpu_id integer default null,
+            bin_id integer default null,
+            task_id integer default null,
+            length integer default null,
             msg text default null
         );
         """)
