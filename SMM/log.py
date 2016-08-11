@@ -12,23 +12,38 @@ class SimLog(object):
 
     def addTask(self, time, task):
         if self._verbose:
-            print("{:020d}: Added Task {}".format(time, task))
+            self.printTimeEvent(time, 0, "add_task", task=task)
 
-    def genericEvent(self, time, cpu, event, length, bin=None):
+    def removeTask(self, time, task):
+        if self._verbose:
+            self.printTimeEvent(time, 0, "rm_task", task=task)
+
+    def printTimeEvent(self, time, length, event, task=None, cpu=None, bin=None, msg=None):
+        bin_id = None
         if bin is not None:
             bin_id = bin.getId()
-        else:
-            bin_id = 0
-
-        if cpu is None:
-            cpu = 0
 
         if self._verbose:
-            print("{:020d}: Proc {:04d}: Bin {:08d} Event:{} Length:{}".format(time, cpu, bin_id, event, length))
+            printable = {
+                "Time":("{Time:020d}", time),
+                "Event":("{Event:<10}", event),
+                "Proc":("{Proc:04d}", cpu),
+                "Bin":("{Bin:08d}", bin_id),
+                "Task":("{Task}", task),
+                "Length":("{Length}", length),
+                "Msg":("{Msg}", msg),
+            }
+            order = ["Time", "Event", "Proc", "Bin", "Task", "Length", "Msg"]
+            fmt = ""
+            for o in order:
+                if printable[o][1] is not None:
+                    fmt += "{}: {} ".format(o, printable[o][0])
 
-    def taskEvent(self, time, task, cpu, bin):
-        if self._verbose:
-            print("{:020d}: Proc {:04d}: Bin {:08d} Task {}".format(time, cpu, bin.getId(), task))
+            items = ({k: v[1] for (k, v) in printable.items()})
+            print(fmt.format(**items))
+
+    def timeEvent(self, time, length, event, task=None, cpu=None, bin=None, msg=None):
+        self.printTimeEvent(time, length, event, task, cpu, bin, msg)
 
     def warning(self, time, msg):
         print("{:020d}: Warning {}".format(time, msg))
@@ -58,7 +73,16 @@ class SqliteLog(SimLog):
 
         c.execute("""
         CREATE TABLE event
-        (id integer primary key, time int, cpu_id int, bin_id int, task_id int default null, generic_id default null, length int null);
+        (
+            id integer primary key,
+            time int,
+            type_id default null,
+            cpu_id int default null,
+            bin_id int default null,
+            task_id int default null,
+            length int default null,
+            msg text default null
+        );
         """)
         c.execute("""
         CREATE TABLE task
@@ -66,7 +90,7 @@ class SqliteLog(SimLog):
         """
         )
         c.execute("""
-        CREATE TABLE generic_event
+        CREATE TABLE event_type
         (id int primary key, name text);
         """
         )
@@ -100,9 +124,19 @@ class SqliteLog(SimLog):
         )
         self.__tasks[task] = i
 
-    def genericEvent(self, time, cpu, event, length, bin=None):
+        self.timeEvent(time, 0, "add_task", task=task)
+
+    def removeTask(self, time, task):
+        self.timeEvent(time, 0, "rm_task", task=task)
+
         if self._verbose:
-            super().genericEvent(time, cpu, event, length, bin)
+            super().removeTask(time, task)
+
+        del self.__tasks[task]
+
+    def timeEvent(self, time, length, event, task=None, cpu=None, bin=None, msg=None):
+        if self._verbose:
+            super().timeEvent(time, length, event, task, cpu, bin, msg)
 
         if bin:
             bin_id = bin.getId()
@@ -112,25 +146,19 @@ class SqliteLog(SimLog):
         if event not in self.__events:
             self.__events[event] = self.__eventid
             self.__cursor.execute(
-                "INSERT INTO generic_event (id, name) VALUES (?, ?);",
+                "INSERT INTO event_type (id, name) VALUES (?, ?);",
                 (self.__eventid, event)
             )
             self.__eventid += 1
 
         event_id = self.__events[event]
+        task_id = None
+        if task is not None:
+            task_id = self.__tasks[task]
 
         self.__cursor.execute(
-            "INSERT INTO event (time, cpu_id, bin_id, generic_id, length) VALUES (?, ?, ?, ?, ?);",
-            (time, cpu, bin_id, event_id, length)
-        )
-
-    def taskEvent(self, time, task, cpu, bin):
-        if self._verbose:
-            super().taskEvent(time, task, cpu, bin)
-
-        self.__cursor.execute(
-            "INSERT INTO event (time, cpu_id, bin_id, task_id, length) VALUES (?, ?, ?, ?, ?);",
-            (time, cpu, bin.getId(), self.__tasks[task], task.getCost())
+            "INSERT INTO event (time, cpu_id, bin_id, type_id, task_id, length, msg) VALUES (?, ?, ?, ?, ?, ?, ?);",
+            (time, cpu, bin_id, event_id, task_id, length, msg)
         )
 
     def endLog(self):

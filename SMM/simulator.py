@@ -32,9 +32,11 @@ class SchedulerState:
         for k, v in self.__state.items():
             self.__updateVarState(k, v)
 
-    def ranTask(self, task):
+    def ranTask(self, time, task):
+        self.__logger.removeTask(time, task)
         if self.getVar('rantask') == 'reschedule':
             task.reset()
+            self.__logger.addTask(time, task)
             self.__binpacker.addTask(task)
         elif self.getVar('rantask') == 'discard':
             pass
@@ -67,6 +69,8 @@ class SchedulerState:
         parent.addSubCheck(new_check)
         new_tasks = self.__checksplitter.splitChecks(new_check, self.__state['taskgran'])
 
+        self.__logger.timeEvent(self.__time, 0, "add_check", msg="Added {}".format(new_check))
+
         for t in new_tasks:
             self.__logger.addTask(self.getTime(), t)
             self.__binpacker.addTask(t)
@@ -83,14 +87,14 @@ class SchedulerState:
             self.__checksplitter = checksplitters[v]()
 
     def removeCheck(self, check):
-        self.__logger.genericEvent(self.__time, None, "Removed Check {}".format(check), 0)
+        self.__logger.timeEvent(self.__time, 0, "rm_check", msg="Removed {}".format(check))
 
         subcheck = check.getGroup().removeSubCheck(check.getName())
         if subcheck:
             self.__binpacker.removeSubCheck(subcheck)
 
     def updateVar(self, k, v):
-        self.__logger.genericEvent(self.__time, None, "Changed Var {} to {}".format(k, v), 0)
+        self.__logger.timeEvent(self.__time, 0, "varchange", msg="Changed Var {} to {}".format(k, v))
         self.__state[k] = v
         self.__updateVarState(k, v)
 
@@ -257,19 +261,19 @@ def main():
         cpu_count = state.getVar('cpus')
         for cpu_id in range(cpu_count):
             bins.append(state.getPacker().requestBin(state, cpu_id))
-            logger.genericEvent(state.getTime(), cpu_id, "SMI", state.getVar('smmoverhead'))
+            logger.timeEvent(state.getTime(), state.getVar('smmoverhead'), "SMI", cpu=cpu_id)
 
         state.moveTime(state.getVar('smmoverhead'))
 
         for b, cpu_id in zip(bins, range(cpu_count)):
-            logger.genericEvent(state.getTime(), cpu_id, "Bin Begin", 0, bin=b)
+            logger.timeEvent(state.getTime(), 0, "bin_start", cpu=cpu_id, bin=b)
             for t in b.getTasks():
-                logger.taskEvent(state.getTime(), t, cpu_id, b)
+                logger.timeEvent(state.getTime(), t.getCost(), "run_task", task=t, cpu=cpu_id, bin=b)
                 t.run(state.getTime())
                 state.moveTime(t.getCost())
-                state.ranTask(t)
+                state.ranTask(state.getTime(), t)
 
-        logger.genericEvent(state.getTime(), cpu_id, "Bin End", 0, bin=b)
+        logger.timeEvent(state.getTime(), 0, "bin_end", cpu=cpu_id, bin=b)
 
         #Assumes that overlapping bins will wait until previous bin finishes
         if next_time > state.getTime():
