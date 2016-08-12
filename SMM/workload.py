@@ -85,41 +85,54 @@ def randWorkload():
                         action='store_true',
                         help='Enable schema validator.')
 
+    parser.add_argument('--prelude-only',
+                        default=False,
+                        action='store_true',
+                        help='Only emit prelude')
+
+    parser.add_argument('--skip-prelude',
+                        default=False,
+                        action='store_true',
+                        help='Skip prelude')
+
+
     args = parser.parse_args()
 
     w = Workload(args.validate)
 
-    w.changeVars(
-        {
-            'taskgran':args.granularity,
-            'smmpersecond':args.smm_per_sec,
-            'smmoverhead':args.smm_cost,
-            'binsize':args.bin_size,
-            'binpacker':args.binpacker,
-            'cpus':args.cpus,
-            'checksplitter':args.checksplitter,
-            'rantask':'discard',
-        }
-    )
+    if not args.skip_prelude:
+        w.changeVars(
+            {
+                'taskgran':args.granularity,
+                'smmpersecond':args.smm_per_sec,
+                'smmoverhead':args.smm_cost,
+                'binsize':args.bin_size,
+                'binpacker':args.binpacker,
+                'cpus':args.cpus,
+                'checksplitter':args.checksplitter,
+                'rantask':'discard',
+            }
+        )
 
-    cost = np.random.normal(args.cost_mu, args.cost_sigma, args.checks)
-    cost = np.clip(cost, 1, 1000)
-    priority = np.random.normal(args.priority_mu, args.priority_sigma, args.checks)
-    priority = np.clip(priority, 1, 20)
+    if not args.prelude_only:
+        cost = np.random.normal(args.cost_mu, args.cost_sigma, args.checks)
+        cost = np.clip(cost, 1, 1000)
+        priority = np.random.normal(args.priority_mu, args.priority_sigma, args.checks)
+        priority = np.clip(priority, 1, 20)
 
-    insertion = (args.sim_length * 10**6) / args.checks
-    for i in range(args.checks):
-        cg = scheduler.CheckGroup('random_' + str(i))
-        c = scheduler.Check(str(i), int(priority[i]), int(cost[i]))
-        cg.addSubCheck(c)
-        w.createCheck(cg)
-        w.timeForward(insertion)
+        insertion = (args.sim_length * 10**6) / args.checks
+        for i in range(args.checks):
+            cg = scheduler.CheckGroup('random_' + str(i))
+            c = scheduler.Check(str(i), int(priority[i]), int(cost[i]))
+            cg.addSubCheck(c)
+            w.createCheck(cg)
+            w.timeForward(insertion)
 
-    endtime = args.sim_length * 10**6
-    if endtime < w.getTime():
-        w.moveTimeForward(endtime - w.getTime())
+        endtime = args.sim_length * 10**6
+        if endtime < w.getTime():
+            w.moveTimeForward(endtime - w.getTime())
 
-    w.endSim()
+        w.endSim()
 
     w.writeWorkload(args.file)
 

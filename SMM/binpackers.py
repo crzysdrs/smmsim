@@ -155,10 +155,6 @@ class BinQueue(DefaultBin):
         self._queue = list(filter(lambda t:  t.getCheck() == subcheck, self.unusedTasks()))
         self._binqueue = []
 
-class FirstFit(BinQueue):
-    def requestBin(self, state, cpu_id):
-        return super()._requestBin(state, cpu_id)
-
 class LPBinPack(BinQueue):
     def computeBins(self, state, cpu_id):
         import pulp

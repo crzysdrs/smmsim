@@ -3,6 +3,9 @@
 import sqlite3
 import numpy as np
 import argparse
+import json
+import os
+import sys
 
 def taskid(name):
     return "(select id from event_type where name = '{}')".format(name)
@@ -19,13 +22,22 @@ def responsetime(conn):
     runtimes = np.array(runtimes)
     nones = runtimes == np.array(None)
     (finished, nofinish) = (runtimes[(~nones).all(axis=1)], runtimes[nones.any(axis=1)])
-    print ("Tasks Finished {} Tasks Remaining {}".format(len(finished), len(nofinish)))
+
     runtimes = np.transpose(finished)
     (start, finish) = np.split(runtimes, 2)
 
     actual = np.subtract(finish, start)
-    print ("Response Times for Tasks (microseconds):\n Min {} Mean {} Max {}".format(np.min(actual), np.mean(actual), np.max(actual)))
-    return actual
+    return {
+        "completion":{
+            "finished":len(finished),
+            "dnf":len(nofinish),
+        },
+        "response_times":{
+            "min":float(np.min(actual)),
+            "mean":float(np.mean(actual)),
+            "max":float(np.max(actual))
+        }
+    }
 
 def maxtime(conn):
     c = conn.cursor()
@@ -39,10 +51,14 @@ def cputime(conn):
     total_bin_time = r[0]['total_bin_time'];
     last_time = maxtime(conn)
 
+    cputime = 0
     if total_bin_time and last_time:
-        return total_bin_time / last_time
-    else:
-        return 0
+        cpu_time = total_bin_time / last_time
+
+    return {
+        "cpu_time":cpu_time
+    }
+
 
 def totaltasks(conn):
     c = conn.cursor()
@@ -54,13 +70,17 @@ def throughput(conn):
     last_time = maxtime(conn)
     total_tasks = totaltasks(conn)
 
-    return total_tasks / (last_time / (10**6))
+    return {
+        "throughput_tasks_per_second": (total_tasks / (last_time / (10**6)))
+    }
 
 def throughputbin(conn):
     c = conn.cursor()
     bc = bincount(conn)
     total_tasks = totaltasks(conn)
-    return total_tasks / bc[0]
+    return  {
+        "throughput_tasks_per_bin": total_tasks / bc['bins']['count']
+    }
 
 def bincount(conn):
     c = conn.cursor()
@@ -70,15 +90,29 @@ def bincount(conn):
     where bin_id not null
     group by bin_id""").fetchall()
     bindata = np.array(r)
+
     if len(bindata):
-        return (len(bindata), np.min(bindata), np.max(bindata), np.mean(bindata) )
+        binfo = (len(bindata), np.min(bindata), np.max(bindata), np.mean(bindata) )
     else:
-        return (0, 0, 0, 0)
+        binfo = (0, 0, 0, 0)
+
+    return {
+        "bins":{
+            "count":float(binfo[0]),
+            "length":{
+                "min":float(binfo[1]),
+                "max":float(binfo[2]),
+                "mean":float(binfo[3])
+            }
+        }
+    }
 
 def miscdata(conn):
     c = conn.cursor()
     r = c.execute("select * from misc").fetchall()
-    return r
+    return {
+        "meta":{k:str(v) for k,v in r}
+    }
 
 def main():
     parser = argparse.ArgumentParser(description='Benchmark Enforcement Tool')
@@ -87,17 +121,22 @@ def main():
 
     args = parser.parse_args()
 
-    print("Benchmarking...")
+    if not os.path.exists(args.db):
+        print("DB does not exist");
+        sys.exit(1)
+
     conn = sqlite3.connect(args.db)
     conn.row_factory = sqlite3.Row
 
-    print ("\n".join(map(lambda x : "Misc Data {:>15}:{}".format(x['key'], x['val']), miscdata(conn))))
-    print ("Bins Total: {} \nBin Length min/max/avg (microseconds): {:>15} {:>15} {:>15.2f}".format(*bincount(conn)))
-    responsetime(conn)
+    data = {}
+    data.update(miscdata(conn))
+    data.update(bincount(conn))
+    data.update(responsetime(conn))
+    data.update(cputime(conn))
+    data.update(throughput(conn))
+    data.update(throughputbin(conn))
 
-    print ("SMM CPU Time Percentage: {}%".format(cputime(conn) * 100))
-    print ("Throughput {} tasks/second".format(throughput(conn)))
-    print ("Throughput {} tasks/bin".format(throughputbin(conn)))
+    print(json.dumps(data, indent=4, sort_keys=True))
 
 if __name__ == "__main__":
     main()
