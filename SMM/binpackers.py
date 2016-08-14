@@ -101,7 +101,6 @@ class FillBin(DefaultBin):
 
         i = len(self._queue) - 1
         while space >= 0 and i >= 0:
-            print(best[space][i])
             if not best[space][i]:
                 break
 
