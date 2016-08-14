@@ -100,7 +100,6 @@ class FillBin(DefaultBin):
         space = state.getVar('binsize')
 
         i = len(self._queue) - 1
-        print(best[space][i])
         while space >= 0 and i >= 0:
             print(best[space][i])
             if not best[space][i]:
@@ -115,7 +114,6 @@ class FillBin(DefaultBin):
                 i -= 1
             else:
                 break
-        print(list(map(lambda x : x.getCost(), b.getTasks())))
         self._queue = list(filter(lambda x : x is not None, self._queue))
         return b
 
