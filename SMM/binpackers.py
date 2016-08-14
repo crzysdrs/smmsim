@@ -79,36 +79,35 @@ class LeastRecentBin(DefaultBin):
 
 class FillBin(DefaultBin):
     def requestFillBin(self, criteria, state):
-        def fillBin(criteria, best, space, i, choices):
-            if space <= 0 or i < 0:
-                return (0, None)
-            elif best[space][i] is not None:
-                pass
-            else:
-                best[space][i] = fillBin(criteria, best, space, i - 1, choices)
-                if space >= choices[i].getCost():
-                    sub = fillBin(criteria, best, space - choices[i].getCost(), i - 1, choices)
-                    b = (sub[0] + criteria(choices[i]), i)
-                    if best[space][i][0] < b[0]:
-                        best[space][i] = b
-
-            return best[space][i]
-
         b = Bin()
 
         best = [[None for y in range(len(self._queue))] for x in range(state.getVar('binsize') + 1)]
 
-        fillBin(criteria, best, state.getVar('binsize'), len(self._queue) - 1, self._queue)
+        for i in range(len(self._queue)):
+            for j in range(state.getVar('binsize') + 1):
+                if i > 0:
+                    best[j][i] = best[j][i-1]
+                else:
+                    best[j][i] = (0, None)
+
+                cost = self._queue[i].getCost()
+                if cost < j:
+                    sub = best[j - cost][i]
+                    new = (sub[0] + criteria(self._queue[i]), i)
+                    if best[j][i][0] < new[0]:
+                        best[j][i] = new
 
         space = state.getVar('binsize')
 
         i = len(self._queue) - 1
+        print(best[space][i])
         while space >= 0 and i >= 0:
+            print(best[space][i])
             if not best[space][i]:
                 break
 
             i = best[space][i][1]
-            if i:
+            if i is not None:
                 c = self._queue[i]
                 b.addTask(c)
                 self._queue[i] = None
@@ -116,7 +115,7 @@ class FillBin(DefaultBin):
                 i -= 1
             else:
                 break
-
+        print(list(map(lambda x : x.getCost(), b.getTasks())))
         self._queue = list(filter(lambda x : x is not None, self._queue))
         return b
 
