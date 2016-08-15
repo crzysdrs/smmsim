@@ -76,8 +76,8 @@ class Check:
     def getGroup(self):
         return self.__group
 
-    def makeTask(self, index, cost):
-        return Task(self, index, cost)
+    def makeTask(self, index, cost, time):
+        return Task(self, index, cost, time)
 
     def getCost(self):
         return self.__cost
@@ -117,11 +117,11 @@ class Check:
         }
 
 class Task:
-    def __init__(self, subcheck, index, cost):
+    def __init__(self, subcheck, index, cost, time):
         self.__subcheck = subcheck
         self.__index = index
         self.__cost = cost
-        self.__lastTime = 0
+        self.__lastTime = time
         self.__priority = self.__subcheck.getPriority()
 
     def reset(self):

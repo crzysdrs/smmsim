@@ -4,6 +4,7 @@ from SMM import scheduler, schema
 import json
 import argparse
 import numpy as np
+import random
 
 class Workload:
     def __init__(self, validate):
@@ -64,18 +65,18 @@ def randWorkload():
     parser = argparse.ArgumentParser(description='Create a workload for an SMM Scheduler Simulator')
     scheduler.schedulerOptions(parser)
 
-    parser.add_argument('--cost_mu', type=float, default=10,
+    parser.add_argument('--cost-mu', type=float, default=10,
                         help='Cost Mean')
-    parser.add_argument('--cost_sigma', type=float, default=1,
-                        help='Cost Sigma')
+    parser.add_argument('--cost-sigma', type=float, default=1,
+                        help='Priority Sigma')
 
-    parser.add_argument('--priority_mu', type=int, default=10,
+    parser.add_argument('--priority-mu', type=int, default=10,
                         help='Cost Mean')
-    parser.add_argument('--priority_sigma', type=int, default=5,
-                        help='Cost Sigma')
+    parser.add_argument('--priority-sigma', type=int, default=5,
+                        help='Priority Sigma')
 
-    parser.add_argument('checks', type=int,
-                        help='Number of Checks')
+    parser.add_argument('load', type=float,
+                        help='Total Load')
 
     parser.add_argument('file', type=str,
                         help='Specify the workload output file.')
@@ -114,27 +115,47 @@ def randWorkload():
             }
         )
 
+    one_second = 10**6
     if not args.prelude_only:
-        cost = np.random.normal(args.cost_mu, args.cost_sigma, args.checks)
-        cost = np.clip(cost, 1, 1000)
-        priority = np.random.normal(args.priority_mu, args.priority_sigma, args.checks)
-        priority = np.clip(priority, 1, 20)
+        check_count = 0
+        smm_count = 1
+        total = 0
 
-        insertion = (args.sim_length * 10**6) / args.checks
-        for i in range(args.checks):
-            cg = scheduler.CheckGroup('random_' + str(i))
-            c = scheduler.Check(str(i), int(priority[i]), int(cost[i]))
-            cg.addSubCheck(c)
-            w.createCheck(cg)
-            w.timeForward(insertion)
+        next_time = w.getTime() + one_second // args.smm_per_sec
+        iteration_count = 10
+        iteration = (next_time - w.getTime()) / iteration_count
 
         endtime = args.sim_length * 10**6
+        while w.getTime() < endtime:
+            for i in range(iteration_count):
+                rand_size = 10000
+                if check_count % rand_size == 0:
+                    cost = np.random.normal(args.cost_mu, args.cost_sigma, rand_size)
+                    cost = np.clip(cost, 1, 1000)
+                    priority = np.random.normal(args.priority_mu, args.priority_sigma, rand_size)
+                    priority = np.clip(priority, 1, 20)
+
+                while total / (smm_count * args.bin_size) - args.load < - 0.1 * (iteration_count - 1 - i):
+                    cg = scheduler.CheckGroup('random_' + str(check_count))
+                    c = scheduler.Check(str(check_count), int(priority[check_count % rand_size]), int(cost[check_count % rand_size]))
+                    check_count += 1
+                    total += c.getCost()
+                    cg.addSubCheck(c)
+                    w.createCheck(cg)
+
+                w.timeForward(iteration)
+
+            smm_count += 1
+
         if endtime < w.getTime():
             w.moveTimeForward(endtime - w.getTime())
 
         w.endSim()
 
     w.writeWorkload(args.file)
+
+    #print (check_count, smm_count, total)
+    #print (total / (smm_count * args.bin_size) - args.load)
 
 def genericWorkload():
     parser = argparse.ArgumentParser(description='Create a workload for an SMM Scheduler Simulator')

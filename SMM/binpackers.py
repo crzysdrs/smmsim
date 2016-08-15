@@ -55,10 +55,13 @@ class DefaultBin:
     def removeSubCheck(self, subcheck):
         self._queue = list(filter(lambda t:  t.getCheck() == subcheck, self._queue))
 
+    def ageQueue(self):
+        [t.setPriority(t.getPriority() + 1) for t in self._queue]
+
 class AgingBin(DefaultBin):
     def requestBin(self, state, cpu_id):
         b = super().requestBin(state, cpu_id)
-        [t.setPriority(t.getPriority() + 1) for t in self._queue]
+        self.ageQueue()
         return b
 
 class RandomBin(DefaultBin):
@@ -127,7 +130,9 @@ class CostKnapsackBin(KnapsackBin):
 
 class PriorityKnapsackBin(KnapsackBin):
     def requestBin(self, state, cpu_id):
-        return self.requestFillBin(lambda x : x.getPriority(), state)
+        b = self.requestFillBin(lambda x : x.getPriority(), state)
+        self.ageQueue()
+        return b
 
 class BinQueue(DefaultBin):
     def __init__(self):

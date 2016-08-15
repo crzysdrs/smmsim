@@ -69,7 +69,7 @@ class SchedulerState:
             self.__checks[group] = parent
 
         parent.addSubCheck(new_check)
-        new_tasks = self.__checksplitter.splitChecks(new_check, self.__state['taskgran'])
+        new_tasks = self.__checksplitter.splitChecks(new_check, self.__state['taskgran'], self.getTime())
 
         self.__logger.timeEvent(self.__time, 0, "add_check", msg="Added {}".format(new_check))
 

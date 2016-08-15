@@ -86,7 +86,7 @@ class SqliteLog(SimLog):
         """)
         c.execute("""
         CREATE TABLE task
-        (id integer primary key, name text);
+        (id integer primary key, name text, cost integer, priority integer);
         """
         )
         c.execute("""
@@ -116,8 +116,8 @@ class SqliteLog(SimLog):
         self.__taskid += 1
 
         self.__cursor.execute(
-            "INSERT INTO task (id, name) VALUES (?, ?);",
-            (i, str(task))
+            "INSERT INTO task (id, name, priority, cost) VALUES (?, ?, ?, ?);",
+            (i, str(task), task.getPriority(), task.getCost())
         )
         self.__tasks[task] = i
 

@@ -10,32 +10,72 @@ import sys
 def taskid(name):
     return "(select id from event_type where name = '{}')".format(name)
 
+def avghist(data, weights, bins=None):
+    if bins is None:
+        sums = np.histogram(data, weights=weights, bins=bins)[0]
+        (counts, buckets) = np.histogram(data, bins=bins)
+    else:
+        sums = np.histogram(data, weights=weights)[0]
+        (counts, buckets) = np.histogram(data)
+
+    #elements with zero count will by definition have zero sum, ignore div by zero
+    counts[counts == 0] = 1
+
+    bin_means = np.divide(sums, counts)
+    return (bin_means, buckets)
+
+def binresponsetime(conn):
+    c = conn.cursor()
+    results = c.execute("""
+    select task.cost, task.priority, finished.time - event.time as responsetime
+    from event
+    left join (select time, task_id from event where type_id=""" + taskid("run_task") + """) as finished
+          on event.task_id = finished.task_id
+    left join task on task.id = event.task_id
+    where event.type_id=""" + taskid("add_task")).fetchall()
+
+    results = np.array(results)
+    #print(results)
+    finished_results = results[np.not_equal(results[:,2],None),:]
+    #print(finished_results)
+    cost_range = (np.min(finished_results[:,0]), np.max(finished_results[:,0]))
+    cost = avghist(finished_results[:,0], weights=finished_results[:,2], bins=np.linspace(cost_range[0], cost_range[1], num=20))
+    priority = avghist(finished_results[:,1], weights=finished_results[:,2],  bins=range(1, 21))
+
+    r = {
+        'responsebin':{
+            'cost':list(cost[0]),
+            'cost_bins':list(cost[1]),
+            'priority':list(priority[0]),
+            'priority_bins':list(map(float, priority[1]))
+        }
+    }
+    return r
+
 def responsetime(conn):
     c = conn.cursor()
-    runtimes = c.execute("""
-    select event.time, finished.time
+    results = c.execute("""
+    select finished.time, event.time, finished.time - event.time as responsetime
     from event
     left join (select time, task_id from event where type_id=""" + taskid("run_task") + """) as finished
           on event.task_id = finished.task_id
     where event.type_id=""" + taskid("add_task")).fetchall()
 
-    runtimes = np.array(runtimes)
+    results = np.matrix(results)
+    runtimes = results[:,2]
+
     nones = runtimes == np.array(None)
     (finished, nofinish) = (runtimes[(~nones).all(axis=1)], runtimes[nones.any(axis=1)])
 
-    runtimes = np.transpose(finished)
-    (start, finish) = np.split(runtimes, 2)
-
-    actual = np.subtract(finish, start)
     return {
         "completion":{
             "finished":len(finished),
             "dnf":len(nofinish),
         },
         "response_times":{
-            "min":float(np.min(actual)),
-            "mean":float(np.mean(actual)),
-            "max":float(np.max(actual))
+            "min":float(np.min(finished)),
+            "mean":float(np.mean(finished)),
+            "max":float(np.max(finished))
         }
     }
 
@@ -132,11 +172,13 @@ def main():
     data.update(miscdata(conn))
     data.update(bincount(conn))
     data.update(responsetime(conn))
+    data.update(binresponsetime(conn))
     data.update(cputime(conn))
     data.update(throughput(conn))
     data.update(throughputbin(conn))
 
     print(json.dumps(data, indent=4, sort_keys=True))
+
 
 if __name__ == "__main__":
     main()
