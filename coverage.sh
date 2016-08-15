@@ -45,15 +45,15 @@ run_sim "10 --cpus 4" ""
 
 run_sim "10 --binpacker LeastRecentBin" ""
 
-run_sim "10 --binpacker MaxFillBin" ""
+run_sim "10 --binpacker PriorityKnapsackBin" ""
 
-run_sim "10 --binpacker MaxPriorityBin"  ""
+run_sim "10 --binpacker CostKnapsackBin"  ""
 
 run_sim "10 --binpacker LPBinPack"  ""
 
 run_sim2 "10 --binpacker RandomBin" ""
 
-run_rand "10 1000" ""
+run_rand "10 0.90" ""
 
 run_sim "10 --binpacker RandomBin" "--sqllog random.db"
 
