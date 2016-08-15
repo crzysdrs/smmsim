@@ -77,7 +77,7 @@ class LeastRecentBin(DefaultBin):
     def requestBin(self, state, cpu_id):
         return super().requestBin(state, cpu_id)
 
-class FillBin(DefaultBin):
+class KnapsackBin(DefaultBin):
     def requestFillBin(self, criteria, state):
         b = Bin()
 
@@ -91,8 +91,11 @@ class FillBin(DefaultBin):
                     best[j][i] = (0, None)
 
                 cost = self._queue[i].getCost()
-                if cost < j:
-                    sub = best[j - cost][i]
+                if cost <= j:
+                    if i > 0:
+                        sub = best[j - cost][i - 1]
+                    else:
+                        sub = (0, None)
                     new = (sub[0] + criteria(self._queue[i]), i)
                     if best[j][i][0] < new[0]:
                         best[j][i] = new
@@ -100,6 +103,7 @@ class FillBin(DefaultBin):
         space = state.getVar('binsize')
 
         i = len(self._queue) - 1
+
         while space >= 0 and i >= 0:
             if not best[space][i]:
                 break
@@ -113,14 +117,15 @@ class FillBin(DefaultBin):
                 i -= 1
             else:
                 break
+
         self._queue = list(filter(lambda x : x is not None, self._queue))
         return b
 
-class MaxFillBin(FillBin):
+class CostKnapsackBin(KnapsackBin):
     def requestBin(self, state, cpu_id):
         return self.requestFillBin(lambda x : x.getCost(), state)
 
-class MaxPriorityBin(FillBin):
+class PriorityKnapsackBin(KnapsackBin):
     def requestBin(self, state, cpu_id):
         return self.requestFillBin(lambda x : x.getPriority(), state)
 
@@ -234,8 +239,16 @@ class LPBinPack(BinQueue):
 
                 bins[binNum].addTask(itemNum)
 
-        self._binqueue = list(bins.values())
-        self._queue = []
+        self._binqueue = sorted(bins.values(), key=lambda b:b.getCost(), reverse=True)
+        split = int(len(self._binqueue) * 0.75)
+        if split > 1:
+            (self._binqueue, dropped) = (self._binqueue[:split], self._binqueue[split:])
+            self._queue = sum(map(lambda d: d.getTasks(), dropped), [])
+        else:
+            self._queue = []
+
+        #print (list(map(lambda b : b.getCost(), self._binqueue)))
+
 
     def requestBin(self, state, cpu_id):
         return super()._requestBin(state, cpu_id)
