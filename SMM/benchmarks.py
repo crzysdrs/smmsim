@@ -35,10 +35,9 @@ def binresponsetime(conn):
     left join task on task.id = event.task_id
     where event.type_id=""" + taskid("add_task")).fetchall()
 
-    results = np.array(results)
-    #print(results)
-    finished_results = results[np.not_equal(results[:,2],None),:]
-    #print(finished_results)
+    results = np.array(results, dtype=float)
+    finished_results = results[~np.isnan(results[:,2])]
+
     cost = avghist(finished_results[:,0], weights=finished_results[:,2], bins=np.linspace(0, 50, num=20))
     priority = avghist(finished_results[:,1], weights=finished_results[:,2],  bins=list(range(1, 21)))
 
@@ -61,21 +60,22 @@ def responsetime(conn):
           on event.task_id = finished.task_id
     where event.type_id=""" + taskid("add_task")).fetchall()
 
-    results = np.matrix(results)
+    results = np.matrix(results, dtype=float)
     runtimes = results[:,2]
 
     nones = runtimes == np.array(None)
-    (finished, nofinish) = (runtimes[(~nones).all(axis=1)], runtimes[nones.any(axis=1)])
+    (finished, nofinish) = (runtimes[~np.isnan(runtimes).all(axis=1)], runtimes[np.isnan(runtimes).any(axis=1)])
 
     return {
         "completion":{
-            "finished":len(finished),
-            "dnf":len(nofinish),
+            "finished":finished.size,
+            "dnf":nofinish.size,
         },
         "response_times":{
-            "min":float(np.min(finished)),
-            "mean":float(np.mean(finished)),
-            "max":float(np.max(finished))
+            "min":np.min(finished),
+            "mean":np.mean(finished),
+            "max":np.max(finished),
+            "std":np.std(finished)
         }
     }
 
@@ -129,12 +129,12 @@ def bincount(conn):
     from event
     where bin_id not null
     group by bin_id""").fetchall()
-    bindata = np.array(r)
+    bindata = np.array(r, dtype=float)
 
     if len(bindata):
-        binfo = (len(bindata), np.min(bindata), np.max(bindata), np.mean(bindata) )
+        binfo = (len(bindata), np.min(bindata), np.max(bindata), np.mean(bindata), np.std(bindata) )
     else:
-        binfo = (0, 0, 0, 0)
+        binfo = (0, 0, 0, 0, 0)
 
     return {
         "bins":{
@@ -142,7 +142,8 @@ def bincount(conn):
             "length":{
                 "min":float(binfo[1]),
                 "max":float(binfo[2]),
-                "mean":float(binfo[3])
+                "mean":float(binfo[3]),
+                "std":float(binfo[4]),
             }
         }
     }

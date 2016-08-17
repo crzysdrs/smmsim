@@ -95,11 +95,15 @@ def main():
 
     priorities = {}
     costs = {}
-
+    bin_data = {
+        '':['Avg Cost', 'Std Dev Cost'],
+    }
     throughput = {
         '': ['Tasks/Bin', 'Tasks/Second']
     }
-
+    response_stat = {
+        '': ['Avg Response', 'Std Dev Response']
+    }
     for k,v in benchmarks.items():
         priorities['bins'] = v['responsebin']['priority_bins'][1:]
         priorities[k] = v['responsebin']['priority']
@@ -109,8 +113,10 @@ def main():
 
 
         throughput[k] = [v['throughput_tasks_per_bin'], v['throughput_tasks_per_second']]
+        bin_data[k] = [v['bins']['length']['mean'], v['bins']['length']['std']]
 
-    print(priorities)
+        response_stat[k] = [v['response_times']['mean'], v['response_times']['std']]
+
 
     chart_opts = {
         'tablefmt':"plain",
@@ -127,7 +133,10 @@ def main():
         'numalign':"right",
         'headers':"firstrow"
     }
+
+    print_table('tables/response_stat.tex', transpose_data(transpose_data_fmt(response_stat, first_col='')), table_opts )
     print_table('tables/throughput.tex', transpose_data(transpose_data_fmt(throughput, first_col='')), table_opts )
+    print_table('tables/bin_stat.tex', transpose_data(transpose_data_fmt(bin_data, first_col='')), table_opts )
 
 if __name__ == '__main__':
     main()
