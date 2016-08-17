@@ -5,44 +5,34 @@ from SMM import scheduler
 import os
 import json
 from multiprocessing import Pool
+from tabulate import tabulate
+import numpy
 
-def cleanup(v):
-    if isinstance(v, float):
-        return "{:.2f}".format(v)
-    else:
-        return str(v)
+def print_table(location, table, table_opts):
+    with open(location, 'w') as f:
+        f.write(tabulate(table, **table_opts))
 
-def print_chart(name, data):
+def transpose_data_fmt(data, first_col=None):
     max_val = max(map(lambda x : len(x), data.values()))
     min_val = min(map(lambda x : len(x), data.values()))
 
     assert(max_val == min_val)
 
-    keys = list(data.keys())
+    headers = sorted(list(data.keys()))
+    if first_col is not None:
+        if first_col in headers:
+            headers.remove(first_col)
+            headers.insert(0, first_col)
 
-    with open('charts/' + name + ".txt", 'w') as f:
-        f.write(" ".join(keys) + "\n")
+    rows = [headers]
+    for i in range(max_val):
+        rows.append([data[h][i] for h in headers])
 
-        for i in range(max_val):
-            f.write(" ".join(map(lambda k : str(data[k][i]), keys)) + "\n")
+    return rows
 
-def print_table(name, rows, data):
-    max_val = max(map(lambda x : len(x), data.values()))
-    min_val = min(map(lambda x : len(x), data.values()))
 
-    assert(max_val == min_val)
-
-    keys = list(data.keys())
-
-    with open('tables/' + name + ".txt", 'w') as f:
-        f.write("\\begin{tabular}{|" + "|".join(map(lambda x : " r ", [""] + keys)) + "| }\n")
-        f.write("\\hline \n")
-        f.write(" & " + " & ".join(keys) + '\\\\ \\hline' + "\n")
-
-        for i in range(max_val):
-            f.write(" & ".join([rows[i]] + list(map(lambda k :cleanup(data[k][i]), keys))) + "\\\\ \\hline \n")
-
-        f.write("\\end{tabular}\n")
+def transpose_data(table):
+    return numpy.asarray(table).T.tolist()
 
 def run_sim(b):
     os.system("cat results/{bp}.prelude results/sim.workload | smmsim /dev/stdin --sqllog results/{bp}.log".format(bp=b))
@@ -104,8 +94,12 @@ def main():
         benchmarks[b] = json.loads(v.decode())
 
     priorities = {}
-    throughput = {}
     costs = {}
+
+    throughput = {
+        '': ['Tasks/Bin', 'Tasks/Second']
+    }
+
     for k,v in benchmarks.items():
         priorities['bins'] = v['responsebin']['priority_bins'][1:]
         priorities[k] = v['responsebin']['priority']
@@ -118,9 +112,22 @@ def main():
 
     print(priorities)
 
-    print_chart('priorities', priorities)
-    print_chart('costs', costs)
-    print_table('throughput', ['Throughput (tasks/bin)', 'Throughput (tasks/second)'], throughput)
+    chart_opts = {
+        'tablefmt':"plain",
+        'floatfmt':".8f",
+        'numalign':"right",
+        'headers':"firstrow",
+    }
+    print_table('charts/priorities.txt', transpose_data_fmt(priorities, first_col="bins"), chart_opts)
+    print_table('charts/costs.txt', transpose_data_fmt(costs, first_col="bins"), chart_opts)
+
+    table_opts = {
+        'tablefmt':"latex",
+        'floatfmt':".2f",
+        'numalign':"right",
+        'headers':"firstrow"
+    }
+    print_table('tables/throughput.tex', transpose_data(transpose_data_fmt(throughput, first_col='')), table_opts )
 
 if __name__ == '__main__':
     main()

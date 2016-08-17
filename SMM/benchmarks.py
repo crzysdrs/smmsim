@@ -11,9 +11,10 @@ def taskid(name):
     return "(select id from event_type where name = '{}')".format(name)
 
 def avghist(data, weights, bins=None):
-    if bins is None:
+    if bins is not None:
         sums = np.histogram(data, weights=weights, bins=bins)[0]
         (counts, buckets) = np.histogram(data, bins=bins)
+        buckets=bins
     else:
         sums = np.histogram(data, weights=weights)[0]
         (counts, buckets) = np.histogram(data)
@@ -38,9 +39,8 @@ def binresponsetime(conn):
     #print(results)
     finished_results = results[np.not_equal(results[:,2],None),:]
     #print(finished_results)
-    cost_range = (np.min(finished_results[:,0]), np.max(finished_results[:,0]))
-    cost = avghist(finished_results[:,0], weights=finished_results[:,2], bins=np.linspace(cost_range[0], cost_range[1], num=20))
-    priority = avghist(finished_results[:,1], weights=finished_results[:,2],  bins=range(1, 21))
+    cost = avghist(finished_results[:,0], weights=finished_results[:,2], bins=np.linspace(0, 50, num=20))
+    priority = avghist(finished_results[:,1], weights=finished_results[:,2],  bins=list(range(1, 21)))
 
     r = {
         'responsebin':{
