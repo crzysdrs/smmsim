@@ -17,7 +17,6 @@ def print_table(location, table, table_opts, head=None):
             if head:
                 headers = r"\hline" + "\n" + "&".join(["\multicolumn{" + str(n) + "}{c}{" + t + "}" for (n,t) in head]) + r"\\\\"
                 printed = re.sub(r"\\hline", headers, printed, 1)
-                print (headers)
             printed = re.sub(r"\bus\b", "$\\mu$s", printed)
         f.write(printed)
 
@@ -44,12 +43,9 @@ def transpose_data_fmt(data, first_col=None):
 def transpose_data(table):
     return numpy.asarray(table).T.tolist()
 
-def run_sim(b):
-    os.system("cat results/{bp}.prelude results/sim.workload | smmsim /dev/stdin --sqllog results/{bp}.log".format(bp=b))
-
-def run_shortsim(b):
-    os.system("cat results/{bp}.prelude results/shortsim.workload | smmsim /dev/stdin --sqllog results/short_{bp}.log".format(bp=b))
-
+def run_sim(b, sim):
+    cmd = "cat results_{sim}/{bp}.prelude results_{sim}/sim.workload | smmsim /dev/stdin --sqllog results_{sim}/{bp}.log".format(bp=b, sim=sim)
+    os.system(cmd)
 
 def collect_result(b, fname):
     json_result= sp.check_output(
@@ -61,9 +57,6 @@ def collect_result(b, fname):
 def main():
     binpackers = scheduler.getBinPackers()
     sim_time = 1000
-    load_factor = 0.90
-    if not os.path.exists("results"):
-        os.mkdir("results")
 
     if not os.path.exists("charts"):
         os.mkdir("charts")
@@ -71,56 +64,44 @@ def main():
     if not os.path.exists("tables"):
         os.mkdir("tables")
 
-    sp.call(
-        [
-            "smmrandwork",
-            str(sim_time),
-            str(load_factor),
-            "results/sim.workload",
-            "--cost-mu", "25",
-            "--cost-sigma", "50",
-            "--priority-mu", "10",
-            "--priority-sigma", "10",
-            "--skip-prelude"
-        ]
-    )
-
-    sp.call(
-        [
-            "smmrandwork",
-            str(sim_time),
-            "0.95",
-            "results/shortsim.workload",
-            "--cost-mu", "25",
-            "--cost-sigma", "50",
-            "--priority-mu", "10",
-            "--priority-sigma", "10",
-            "--skip-prelude"
-        ]
-    )
-
-    for b in binpackers.keys():
+    sim = [50, 60, 70, 80, 90, 95, 100]
+    for s in sim:
+        if not os.path.exists("results_{}".format(s)):
+            os.mkdir("results_{}".format(s))
         sp.call(
             [
                 "smmrandwork",
-                "--prelude-only",
-                "--binpacker={bp}".format(bp=b),
                 str(sim_time),
-                str(load_factor),
-                "results/{bp}.prelude".format(bp=b)
+                str(s / 100),
+                "results_{sim}/sim.workload".format(sim=s),
+                "--cost-mu", "25",
+                "--cost-sigma", "50",
+                "--priority-mu", "10",
+                "--priority-sigma", "10",
+                "--skip-prelude"
             ]
         )
+        for b in binpackers.keys():
+            sp.call(
+                [
+                    "smmrandwork",
+                    "--prelude-only",
+                    "--binpacker={bp}".format(bp=b),
+                    str(sim_time),
+                    str(1),
+                    "results_{sim}/{bp}.prelude".format(bp=b, sim=s)
+                ]
+            )
 
 
     benchmarks = {}
     short_benchmarks = {}
 
     p = Pool(5)
-    #p.map(run_sim, binpackers.keys())
-    #p.map(run_shortsim, binpackers.keys())
+    p.starmap(run_sim, [(b, s) for b in binpackers.keys() for s in sim])
 
-    results = p.starmap(collect_result, [(b, "results/{bp}.log".format(bp=b)) for b in binpackers.keys()])
-    short_results = p.starmap(collect_result, [(b, "results/short_{bp}.log".format(bp=b)) for b in binpackers.keys()])
+    results = p.starmap(collect_result, [(b, "results_90/{bp}.log".format(bp=b)) for b in binpackers.keys()])
+    short_results = p.starmap(collect_result, [(b, "results_95/{bp}.log".format(bp=b)) for b in binpackers.keys()])
 
     for b,v in results:
         benchmarks[b] = json.loads(v.decode())

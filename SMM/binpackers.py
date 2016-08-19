@@ -225,7 +225,11 @@ class LPBinPack(BinQueue):
 
         # Solve the optimization.
         start_time = time.time()
-        prob.solve()
+        try:
+            prob.solve()
+        except:
+            #Sometimes the solver crashes?! Better luck next time.
+            return
         #print("Solved in %s seconds." % (time.time() - start_time))
 
         # Bins used

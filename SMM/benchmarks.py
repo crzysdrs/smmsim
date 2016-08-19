@@ -27,13 +27,15 @@ def avghist(data, weights, bins=None):
 
 def binresponsetime(conn):
     c = conn.cursor()
-    results = c.execute("""
-    select task.cost, task.priority, finished.time - event.time as responsetime
+    sql = """
+    select task.cost, task.priority, finished.time - event.time as responsetime, finished.time, event.time
     from event
     left join (select time, task_id from event where type_id=""" + taskid("run_task") + """) as finished
           on event.task_id = finished.task_id
     left join task on task.id = event.task_id
-    where event.type_id=""" + taskid("add_task")).fetchall()
+    where event.type_id=""" + taskid("add_task") + " order by event.time"
+
+    results = c.execute(sql).fetchall()
 
     results = np.array(results, dtype=float)
     finished_results = results[~np.isnan(results[:,2])]
