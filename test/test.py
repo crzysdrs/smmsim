@@ -7,10 +7,20 @@ import json
 from multiprocessing import Pool
 from tabulate import tabulate
 import numpy
+import time
+import re
 
-def print_table(location, table, table_opts):
+def print_table(location, table, table_opts, head=None):
     with open(location, 'w') as f:
-        f.write(tabulate(table, **table_opts))
+        printed = tabulate(table, **table_opts)
+        if 'tablefmt' in table_opts and table_opts['tablefmt'] == 'latex':
+            if head:
+                headers = r"\hline" + "\n" + "&".join(["\multicolumn{" + str(n) + "}{c}{" + t + "}" for (n,t) in head]) + r"\\\\"
+                printed = re.sub(r"\\hline", headers, printed, 1)
+                print (headers)
+            printed = re.sub(r"\bus\b", "$\\mu$s", printed)
+        f.write(printed)
+
 
 def transpose_data_fmt(data, first_col=None):
     max_val = max(map(lambda x : len(x), data.values()))
@@ -37,9 +47,13 @@ def transpose_data(table):
 def run_sim(b):
     os.system("cat results/{bp}.prelude results/sim.workload | smmsim /dev/stdin --sqllog results/{bp}.log".format(bp=b))
 
-def collect_result(b):
+def run_shortsim(b):
+    os.system("cat results/{bp}.prelude results/shortsim.workload | smmsim /dev/stdin --sqllog results/short_{bp}.log".format(bp=b))
+
+
+def collect_result(b, fname):
     json_result= sp.check_output(
-        "smmbench results/{bp}.log".format(bp=b),
+        "smmbench {fname}".format(fname=fname),
         shell=True
     )
     return (b, json_result)
@@ -71,6 +85,20 @@ def main():
         ]
     )
 
+    sp.call(
+        [
+            "smmrandwork",
+            str(sim_time),
+            "0.95",
+            "results/shortsim.workload",
+            "--cost-mu", "25",
+            "--cost-sigma", "50",
+            "--priority-mu", "10",
+            "--priority-sigma", "10",
+            "--skip-prelude"
+        ]
+    )
+
     for b in binpackers.keys():
         sp.call(
             [
@@ -85,24 +113,37 @@ def main():
 
 
     benchmarks = {}
+    short_benchmarks = {}
 
     p = Pool(5)
     #p.map(run_sim, binpackers.keys())
-    results = p.map(collect_result, binpackers.keys())
+    #p.map(run_shortsim, binpackers.keys())
+
+    results = p.starmap(collect_result, [(b, "results/{bp}.log".format(bp=b)) for b in binpackers.keys()])
+    short_results = p.starmap(collect_result, [(b, "results/short_{bp}.log".format(bp=b)) for b in binpackers.keys()])
 
     for b,v in results:
         benchmarks[b] = json.loads(v.decode())
+    for b,v in short_results:
+        short_benchmarks[b] = json.loads(v.decode())
 
     priorities = {}
     costs = {}
+    bin_head = [(1, ""), (2, "Bin Cost (us)")]
     bin_data = {
-        '':['Avg Cost', 'Std Dev Cost'],
+        '':['Avg', 'Std Dev', ],
     }
+    throughput_head = [(1, ""), (2, "Tasks/Bin")]
     throughput = {
-        '': ['Tasks/Bin', 'Tasks/Second']
+        '': ['90% Load', '95% Load']
     }
+    response_stat_head = [(1, ""), (2, "Reponse Cost (us)")]
     response_stat = {
-        '': ['Avg Response', 'Std Dev Response']
+        '': ['Avg', 'Std Dev']
+    }
+    runtime_head = [(1, ""), (2, "90\\% Load"), (2, "95\\% Load")]
+    runtime = {
+        '': ['CPU Time', 'Wall Time', 'CPU Time', 'Wall Time']
     }
     for k,v in benchmarks.items():
         priorities['bins'] = v['responsebin']['priority_bins'][1:]
@@ -112,12 +153,22 @@ def main():
         costs[k] = v['responsebin']['cost']
 
 
-        throughput[k] = [v['throughput_tasks_per_bin'], v['throughput_tasks_per_second']]
+        throughput[k] = [v['throughput_tasks_per_bin']]
         bin_data[k] = [v['bins']['length']['mean'], v['bins']['length']['std']]
 
         response_stat[k] = [v['response_times']['mean'], v['response_times']['std']]
 
+        runtime[k] = [
+            float(v['meta']['end_cpu_clock']) - float(v['meta']['start_cpu_clock']),
+            float(v['meta']['end_wall_clock']) - float(v['meta']['start_wall_clock']),
+        ]
 
+    for k,v in short_benchmarks.items():
+        throughput[k] += [v['throughput_tasks_per_bin']]
+        runtime[k] += [
+            float(v['meta']['end_cpu_clock']) - float(v['meta']['start_cpu_clock']),
+            float(v['meta']['end_wall_clock']) - float(v['meta']['start_wall_clock']),
+        ]
     chart_opts = {
         'tablefmt':"plain",
         'floatfmt':".8f",
@@ -134,9 +185,10 @@ def main():
         'headers':"firstrow"
     }
 
-    print_table('tables/response_stat.tex', transpose_data(transpose_data_fmt(response_stat, first_col='')), table_opts )
-    print_table('tables/throughput.tex', transpose_data(transpose_data_fmt(throughput, first_col='')), table_opts )
-    print_table('tables/bin_stat.tex', transpose_data(transpose_data_fmt(bin_data, first_col='')), table_opts )
+    print_table('tables/response_stat.tex', transpose_data(transpose_data_fmt(response_stat, first_col='')), table_opts, head=response_stat_head)
+    print_table('tables/throughput.tex', transpose_data(transpose_data_fmt(throughput, first_col='')), table_opts , head=throughput_head)
+    print_table('tables/bin_stat.tex', transpose_data(transpose_data_fmt(bin_data, first_col='')), table_opts ,head=bin_head)
+    print_table('tables/simrun.tex', transpose_data(transpose_data_fmt(runtime, first_col='')), table_opts, head=runtime_head )
 
 if __name__ == '__main__':
     main()

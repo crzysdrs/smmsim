@@ -174,7 +174,7 @@ class LPBinPack(BinQueue):
             return
 
         # Max number of bins allowed.
-        maxBins = 32
+        maxBins = 10
 
         # Bin Size
         binCapacity = state.getVar("binsize")
@@ -251,6 +251,13 @@ class LPBinPack(BinQueue):
             self._queue = sum(map(lambda d: d.getTasks(), dropped), [])
         else:
             self._queue = []
+
+        #Apparently, if the maxBins is exceeded it just throws all remaining tasks into one big task
+        # which is probably cheating.
+        large = filter(lambda b : b.getCost() > binCapacity, self._binqueue)
+        self._binqueue = list(filter(lambda b : b.getCost() <= binCapacity, self._binqueue))
+
+        self._queue.extend(sum([l.getTasks() for l in large], []))
 
         #print (list(map(lambda b : b.getCost(), self._binqueue)))
 

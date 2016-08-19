@@ -6,7 +6,7 @@ import argparse
 import sys
 import json
 from functools import partial
-from time import gmtime, strftime
+import time as timelib
 import jsonschema
 import numpy as np
 
@@ -240,8 +240,10 @@ def main():
         logger = log.SimLog(args.verbose)
 
     misc = {
-        'start_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),
-        'start_local':strftime("%a, %d %b %Y %X +0000"),
+        'start_gmt':timelib.strftime("%a, %d %b %Y %X +0000", timelib.gmtime()),
+        'start_local':timelib.strftime("%a, %d %b %Y %X +0000"),
+        'start_cpu_clock':timelib.clock(),
+        'start_wall_clock':timelib.time(),
         'ver':get_git_revision_hash(),
         'args': " ".join(map(lambda x : '"{}"'.format(x), sys.argv))
     }
@@ -300,8 +302,10 @@ def main():
     logger.timeEvent(state.getTime(), 0, "end_sim")
 
     misc = {
-        'end_gmt':strftime("%a, %d %b %Y %X +0000", gmtime()),
-        'end_local':strftime("%a, %d %b %Y %X +0000"),
+        'end_gmt':timelib.strftime("%a, %d %b %Y %X +0000", timelib.gmtime()),
+        'end_local':timelib.strftime("%a, %d %b %Y %X +0000"),
+        'end_cpu_clock':timelib.clock(),
+        'end_wall_clock':timelib.time()
     }
 
     for k,v in misc.items():

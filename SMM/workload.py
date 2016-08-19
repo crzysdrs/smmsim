@@ -125,6 +125,8 @@ def randWorkload():
         iteration_count = 10
         iteration = (next_time - w.getTime()) / iteration_count
 
+        total_bin_time = lambda  : (args.cpus * smm_count * args.bin_size)
+
         endtime = args.sim_length * 10**6
         while w.getTime() < endtime:
             for i in range(iteration_count):
@@ -135,7 +137,7 @@ def randWorkload():
                     priority = np.random.normal(args.priority_mu, args.priority_sigma, rand_size)
                     priority = np.clip(priority, 1, 20)
 
-                while total / (smm_count * args.bin_size) - args.load < - 0.1 * (iteration_count - 1 - i):
+                while total / total_bin_time() - args.load < - 0.1 * (iteration_count - 1 - i):
                     cg = scheduler.CheckGroup('random_' + str(check_count))
                     c = scheduler.Check(str(check_count), int(priority[check_count % rand_size]), int(cost[check_count % rand_size]))
                     check_count += 1
