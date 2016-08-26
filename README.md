@@ -34,10 +34,11 @@ usage: smmrandwork [-h] [--task_granularity GRANULARITY]
                    [--priority-mu PRIORITY_MU]
                    [--priority-sigma PRIORITY_SIGMA] [--validate]
                    [--prelude-only] [--skip-prelude]
-                   sim_length load file
+                   [--load] [--checks-per-sec]
+                   sim_length file
 ```
 
-Creates a JSON file format of workload instructions that will be executed by the simulator (i.e. smmsim). Try adjusting the various parameters to create a workload that matches the intended usage of the simulator.
+Creates a JSON file format of workload instructions that will be executed by the simulator (i.e. smmsim). The simulation check creation is controlled by ```--load``` where you specify a workload factor or ```--checks-per-sec``` which specifies the number of checks to create per second. Try adjusting the various parameters to create a workload that matches the intended usage of the simulator.
 
 ### Simulator
 ```
@@ -69,14 +70,14 @@ Given a sqlite database file, run the set of predetermined benchmarks to determi
 Since most of the tools are intended to work with the input/output of the previous, the easiest approach is to use a pipeline of the tools. The ```smmvalidate``` usage is optional, you can turn on validation in either ```smmrandwork``` or ```ssmsim``` for the same effect.
 
 ```
-smmrandwork 1 0.95 /dev/stdout | smmvalidate | smmsim /dev/stdin --sqllog test.db
+smmrandwork 1 --load 0.95 /dev/stdout | smmvalidate | smmsim /dev/stdin --sqllog test.db
 smmbench test.db
 ```
 
 It's also entirely possible to run each individually:
 
 ```
-smmrandwork 1 0.95 my.workload --validate
+smmrandwork 1 --load 0.95 my.workload --validate
 smmsim my.workload --sqllog test.db
 smmbench test.db
 ```

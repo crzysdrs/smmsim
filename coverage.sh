@@ -53,7 +53,9 @@ run_sim "10 --binpacker LPBinPack"  ""
 
 run_sim2 "10 --binpacker RandomBin" ""
 
-run_rand "10 0.90" ""
+run_rand "10 --load 0.90" ""
+
+run_rand "10 --checks-per-sec 30" ""
 
 run_sim "10 --binpacker RandomBin" "--sqllog random.db"
 

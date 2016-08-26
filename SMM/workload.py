@@ -5,6 +5,7 @@ import json
 import argparse
 import numpy as np
 import random
+import os
 
 """ The workload module is a useful entry point for
 creating various JSON workloads for the SMM Simulator
@@ -73,6 +74,70 @@ class Workload:
                     schema.validate(e)
                 f.write(json.dumps(e, indent=4) + "\n")
 
+def loadFactor(w, args):
+    check_count = 0
+    smm_count = 1
+    total = 0
+    one_second = 10 ** 6
+    next_time = w.getTime() + one_second // args.smm_per_sec
+    iteration_count = 10
+    iteration = (next_time - w.getTime()) / iteration_count
+
+    total_bin_time = lambda  : (args.cpus * smm_count * args.bin_size)
+
+    endtime = args.sim_length * 10**6
+    #Try to meter out the checks over the simulation runtime to meet
+    # the workload factor criteria
+    while w.getTime() < endtime:
+        for i in range(iteration_count):
+            rand_size = 10000
+            if check_count % rand_size == 0:
+                cost = np.random.normal(args.cost_mu, args.cost_sigma, rand_size)
+                cost = np.clip(cost, 1, 1000)
+                priority = np.random.normal(args.priority_mu, args.priority_sigma, rand_size)
+                priority = np.clip(priority, 1, 20)
+
+            while total / total_bin_time() - args.load < - 0.1 * (iteration_count - 1 - i):
+                cg = scheduler.CheckGroup('random_' + str(check_count))
+                c = scheduler.Check(str(check_count), int(priority[check_count % rand_size]), int(cost[check_count % rand_size]))
+                check_count += 1
+                total += c.getCost()
+                cg.addSubCheck(c)
+                w.createCheck(cg)
+
+            w.timeForward(iteration)
+
+        smm_count += 1
+
+    if endtime < w.getTime():
+        w.moveTimeForward(endtime - w.getTime())
+
+def uniformChecks(w, args):
+    one_second = 10**6
+    endtime = args.sim_length * one_second
+    timestep = int(one_second / args.checks_per_sec)
+    if timestep <= 0:
+        timestep = 1
+    check_count = 0
+    while w.getTime() < endtime:
+        rand_size = 10000
+        if check_count % rand_size == 0:
+            cost = np.random.normal(args.cost_mu, args.cost_sigma, rand_size)
+            cost = np.clip(cost, 1, 1000)
+            priority = np.random.normal(args.priority_mu, args.priority_sigma, rand_size)
+            priority = np.clip(priority, 1, 20)
+
+        cg = scheduler.CheckGroup('random_' + str(check_count))
+        c = scheduler.Check(
+            str(check_count),
+            int(priority[check_count % rand_size]),
+            int(cost[check_count % rand_size])
+        )
+        check_count += 1
+        cg.addSubCheck(c)
+        w.createCheck(cg)
+        w.timeForward(timestep)
+
 def randWorkload():
     """ Generate a random workload based on random criteria """
     parser = argparse.ArgumentParser(description='Create a workload for an SMM Scheduler Simulator')
@@ -88,8 +153,11 @@ def randWorkload():
     parser.add_argument('--priority-sigma', type=int, default=5,
                         help='Priority Sigma')
 
-    parser.add_argument('load', type=float,
+    parser.add_argument('--load', type=float,
                         help='Total Load')
+
+    parser.add_argument('--checks-per-sec', type=int,
+                        help="Checks per second")
 
     parser.add_argument('file', type=str,
                         help='Specify the workload output file.')
@@ -112,6 +180,10 @@ def randWorkload():
 
     args = parser.parse_args()
 
+    if not ((args.load is None) ^ (args.checks_per_sec is None)):
+        print("Error: Must use --load or --checks-per-sec to define the workload but not both.")
+        sys.exit(1)
+
     w = Workload(args.validate)
 
     if not args.skip_prelude:
@@ -128,44 +200,11 @@ def randWorkload():
             }
         )
 
-    one_second = 10**6
     if not args.prelude_only:
-        check_count = 0
-        smm_count = 1
-        total = 0
-
-        next_time = w.getTime() + one_second // args.smm_per_sec
-        iteration_count = 10
-        iteration = (next_time - w.getTime()) / iteration_count
-
-        total_bin_time = lambda  : (args.cpus * smm_count * args.bin_size)
-
-        endtime = args.sim_length * 10**6
-        #Try to meter out the checks over the simulation runtime to meet
-        # the workload factor criteria
-        while w.getTime() < endtime:
-            for i in range(iteration_count):
-                rand_size = 10000
-                if check_count % rand_size == 0:
-                    cost = np.random.normal(args.cost_mu, args.cost_sigma, rand_size)
-                    cost = np.clip(cost, 1, 1000)
-                    priority = np.random.normal(args.priority_mu, args.priority_sigma, rand_size)
-                    priority = np.clip(priority, 1, 20)
-
-                while total / total_bin_time() - args.load < - 0.1 * (iteration_count - 1 - i):
-                    cg = scheduler.CheckGroup('random_' + str(check_count))
-                    c = scheduler.Check(str(check_count), int(priority[check_count % rand_size]), int(cost[check_count % rand_size]))
-                    check_count += 1
-                    total += c.getCost()
-                    cg.addSubCheck(c)
-                    w.createCheck(cg)
-
-                w.timeForward(iteration)
-
-            smm_count += 1
-
-        if endtime < w.getTime():
-            w.moveTimeForward(endtime - w.getTime())
+        if args.load is not None:
+            loadFactor(w, args)
+        elif args.checks_per_sec is not None:
+            uniformChecks(w, args)
 
         w.endSim()
 
