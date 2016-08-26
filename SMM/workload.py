@@ -6,20 +6,28 @@ import argparse
 import numpy as np
 import random
 
+""" The workload module is a useful entry point for
+creating various JSON workloads for the SMM Simulator
+"""
+
 class Workload:
+    """ A useful generator class to create a JSON workload """
     def __init__(self, validate):
         self.__events = []
         self.__time = 0
         self.__validate = validate
 
     def timeForward(self, n):
+        """ Only move time forward """
         assert(n >= 0)
         self.__time += int(n)
 
     def getTime(self):
+        """ What's the current time? """
         return self.__time
 
     def createCheck(self, c):
+        """Create a check in the workload """
         self.__events.append(
             {
                 'time':self.__time,
@@ -29,6 +37,7 @@ class Workload:
         )
 
     def removeCheck(self, c):
+        """ Remove an check from the workload """
         self.__events.append(
             {
                 'time':self.__time,
@@ -38,6 +47,7 @@ class Workload:
         )
 
     def endSim(self):
+        """ End the simulation """
         self.__events.append(
             {
                 'time':self.__time,
@@ -46,6 +56,7 @@ class Workload:
         )
 
     def changeVars(self, vars):
+        """ Modify the simulator state variables """
         self.__events.append(
             {
                 'time':self.__time,
@@ -55,6 +66,7 @@ class Workload:
         )
 
     def writeWorkload(self, file_path):
+        """ Write the workload to a file """
         with open(file_path, 'w') as f:
             for e in self.__events:
                 if self.__validate:
@@ -62,6 +74,7 @@ class Workload:
                 f.write(json.dumps(e, indent=4) + "\n")
 
 def randWorkload():
+    """ Generate a random workload based on random criteria """
     parser = argparse.ArgumentParser(description='Create a workload for an SMM Scheduler Simulator')
     scheduler.schedulerOptions(parser)
 
@@ -128,6 +141,8 @@ def randWorkload():
         total_bin_time = lambda  : (args.cpus * smm_count * args.bin_size)
 
         endtime = args.sim_length * 10**6
+        #Try to meter out the checks over the simulation runtime to meet
+        # the workload factor criteria
         while w.getTime() < endtime:
             for i in range(iteration_count):
                 rand_size = 10000
@@ -156,10 +171,8 @@ def randWorkload():
 
     w.writeWorkload(args.file)
 
-    #print (check_count, smm_count, total)
-    #print (total / (smm_count * args.bin_size) - args.load)
-
 def genericWorkload():
+    """ Create a generic workload based on the tasks defined in the EPA-RIMM paper """
     parser = argparse.ArgumentParser(description='Create a workload for an SMM Scheduler Simulator')
     scheduler.schedulerOptions(parser)
     parser.add_argument('file', type=str,

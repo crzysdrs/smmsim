@@ -1,6 +1,19 @@
 from SMM import scheduler
 import jsonschema
 
+"""
+Contains the SCHEMA defined for the JSON communication protocol
+for the workload generation to the SMM simulator.
+
+The general idea is that each JSON instruction is a command
+with an associated timestamp. Some commands have additional
+data members that need to be present. By codifying this
+relationship, there isn't a need to implement special validators
+in the simulator or worry about emitting invalid JSON.
+
+Read more about the format at http://json-schema.org/.
+"""
+
 SCHEMA = {
     'oneOf': [
         {'$ref':'#/action'},
@@ -179,9 +192,14 @@ SCHEMA = {
 }
 
 def validate(e):
+    """ Validate a given dict against the SMM schema """
     jsonschema.validate(e, SCHEMA)
 
 def validatestream():
+    """ Validates a stream against the SMM schema
+
+    Useful as an entry point for a standalone Schema validator.
+    """
     import sys
     import json
     import functools

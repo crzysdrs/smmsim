@@ -3,8 +3,19 @@ import random
 from SMM.scheduler import Bin
 import functools
 
-#returns the rightmost insertion location
+"""
+This is a collection of Bin Packing algorithms to be used with
+the SMM simulator. Any class in module that implements
+requestBin will be automatically added to the list of avialable
+bin packers.
+"""
+
 def bisect(l, v, cmp=None):
+    """ Find the rightmost insertion point for an element in a list
+
+    Using list l, find the insertion index for value v, using an
+    an optional comparison function.
+    """
     if not cmp:
         cmp = lambda x, y : 0 if x == y else (1 if x > y else -1)
 
@@ -22,11 +33,25 @@ def bisect(l, v, cmp=None):
     return low
 
 class DefaultBin:
+    """ The Default Bin Packing Algorithm (uses priority queue).
+
+    A simplistic algorithm that reads tasks sequentially
+    from a priority queue. If the next highest priority task
+    does not fit in the bin, the bin is complete.
+    DefaultBin only considers priority and leads to the possibility
+    that low priority tasks will starve. Bins will be filled in
+    O(n) time where n is the number of available tasks.
+    """
     def __init__(self):
         self._queue = []
         self._cmp = lambda x: -x.getPriority()
 
     def getBinKey(self, state, f):
+        """ Determine the next bin based on a ordering function
+
+        The preferred approach is usually to store the ordered
+        tasks in the queue field.
+        """
         b = Bin()
 
         if len(self._queue) == 0:
@@ -43,49 +68,96 @@ class DefaultBin:
         return b
 
     def requestBin(self, state, cpu_id):
+        """ Return a filled bin based on the current state"""
         return self.getBinKey(state, self._cmp)
 
     def addTask(self, task):
+        """ Adds a task to the current bin packer """
         ix = bisect(self._queue, task, cmp=lambda x, y : self._cmp(x) - self._cmp(y))
         self._queue.insert(ix, task)
 
     def unusedTasks(self):
+        """ Return the set of tasks that haven't been placed into a bin
+
+        This is important for bin packers that may have tasks pre-emptively
+        placed in bins. If they are swapped out, they need to relinquish their
+        tasks.
+        """
         return self._queue
 
     def removeSubCheck(self, subcheck):
+        """ Removes a subcheck from the existing queue of tasks """
         self._queue = list(filter(lambda t:  t.getCheck() == subcheck, self._queue))
 
     def ageQueue(self):
+        """ Ages (i.e. reprioritizes) tasks in the queue """
         [t.setPriority(t.getPriority() + 1) for t in self._queue]
 
 class AgingBin(DefaultBin):
+    """ Packs based on a priority queue while aging unused tasks
+
+    Algorithm that reads tasks from a priority queue with an added
+    aging mechanism. This causes any unused tasks still remaining
+    in the queue to increase priority every time they are unselected
+    preventing starvation. If the next highest priority task does
+    not fit the bin is complete. Bins will be filled in O(n)
+    time where n is the number of available tasks.
+    """
     def requestBin(self, state, cpu_id):
+        """ Returns a bin based on the current state """
         b = super().requestBin(state, cpu_id)
         self.ageQueue()
         return b
 
 class RandomBin(DefaultBin):
+    """ Randomly chooses tasks to fill in a bin.
+
+    Uses a randomly permuted queue to determine the next task selection. The algorithm reads from that queue in sequential order until it is unable to fit the next task in the bin. Bins will be filled in O(n) time where n is the number of available tasks.
+    """
     def __init__(self):
+        """ Initialize with random number generator for ordering """
         super().__init__()
         self._cmp = lambda *args : random.random()
 
     def requestBin(self, state, cpu_id):
+        """ Request a bin based on the current state """
         return super().requestBin(state, cpu_id)
 
 class LeastRecentBin(DefaultBin):
+    """ Choose the least recently run task to prioritize.
+
+    When a task is created or executed a time stamp is updated
+    on the task. The time stamps are used as priorities which
+    allows no tasks to be starved as all tasks will be served
+    depending on their age. If the next oldest task does not
+    fit the bin is complete. There is no risk of starvation
+    as old tasks are always effectively highest priority.
+    Bins will be filled in O(n) time  where n is the
+    number of available tasks.
+
+    """
     def __init__(self):
+        """The ordering function should be based on the last time run """
         super().__init__()
         self._cmp = lambda x : x.lastTimeRun()
 
     def requestBin(self, state, cpu_id):
+        """ Request a bin based on the current state """
         return super().requestBin(state, cpu_id)
 
 class KnapsackBin(DefaultBin):
+    """ A generic knapsack bin filler
+
+    This class will be inherited to build a Knapsack filler based
+    on different criteria
+    """
     def requestFillBin(self, criteria, state):
+        """ Return a bin based on a criterion function for knapsack value """
         b = Bin()
 
         best = [[None for y in range(len(self._queue))] for x in range(state.getVar('binsize') + 1)]
 
+        # Bottom Up Knapsack Value Determination
         for i in range(len(self._queue)):
             for j in range(state.getVar('binsize') + 1):
                 if i > 0:
@@ -107,6 +179,8 @@ class KnapsackBin(DefaultBin):
 
         i = len(self._queue) - 1
 
+        # Determine the correct "Best" value based on
+        # bottom uup results.
         while space >= 0 and i >= 0:
             if not best[space][i]:
                 break
@@ -121,25 +195,31 @@ class KnapsackBin(DefaultBin):
             else:
                 break
 
+        #Remove selected tasks from queue
         self._queue = list(filter(lambda x : x is not None, self._queue))
         return b
 
 class CostKnapsackBin(KnapsackBin):
+    """ CostKnapsack uses the Knapsack algorithm with the task cost as criteria"""
     def requestBin(self, state, cpu_id):
         return self.requestFillBin(lambda x : x.getCost(), state)
 
 class PriorityKnapsackBin(KnapsackBin):
+    """ PriorityKnapsack uses the Knapsack algorithm with the task priority as criteria"""
     def requestBin(self, state, cpu_id):
         b = self.requestFillBin(lambda x : x.getPriority(), state)
         self.ageQueue()
         return b
 
 class BinQueue(DefaultBin):
+    """ A generic class that maintains queues of bins to be run in the future."""
     def __init__(self):
+        """ Initializes an empty bin queue for storing future bins """
         super().__init__()
         self._binqueue = []
 
     def _requestBin(self, state, cpu_id):
+        """ Handle the construction of new bins with empty queues """
         if len(self._binqueue) == 0:
             self.computeBins(state, cpu_id)
 
@@ -152,17 +232,36 @@ class BinQueue(DefaultBin):
             return front
 
     def addTask(self, task):
+        """ Add a new task with no priority consideration """
         self._queue.append(task)
 
     def unusedTasks(self):
+        """ Return the set of tasks that may be in bins but not yet run
+        """
         return functools.reduce(lambda x, y : x + y, [b.getTasks() for b in self._binqueue], []) + self._queue
 
     def removeSubCheck(self, subcheck):
+        """ Removes a subcheck from the set of unused tasks """
         self._queue = list(filter(lambda t:  t.getCheck() == subcheck, self.unusedTasks()))
         self._binqueue = []
 
 class LPBinPack(BinQueue):
+    """ Linear Programming Bin Packer
+
+    A linear programming implementation of the canonical
+    Bin Packing algorithm. It provides a minimal number
+    of bins filled with tasks that are as full as possible.
+    One minor modification that is made to this implementation
+    that only the next several bins are kept while the remaining
+    tasks are placed back on the queue. This allows bins to be
+    refilled later in more optimal matter as other tasks become
+    available otherwise the later bins would simply be under filled.
+    LPBinPack is currently limited to finding the best
+    solution with maximum 10 bins to constrain the overall
+    runtime which can be substantial.
+    """
     def computeBins(self, state, cpu_id):
+        """ Compute the next several bins using LP Bin pack algo """
         import pulp
         import time
 
@@ -267,4 +366,5 @@ class LPBinPack(BinQueue):
 
 
     def requestBin(self, state, cpu_id):
+        """ Request the next available bin """
         return super()._requestBin(state, cpu_id)

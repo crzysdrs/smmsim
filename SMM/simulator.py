@@ -10,17 +10,25 @@ import time as timelib
 import jsonschema
 import numpy as np
 
+
 class SchedulerState:
+    """ Maintains the current state of the scheduler
+
+    Anything that can be modified by workload instructions should
+    be included here. This allows a clear seperation line of
+    where the data should be stored/modified so that the state is
+    not stored in local variables throughout the application.
+    """
     def __init__(self, logger):
         self.__state =  {
-            'taskgran':50,
-            'smmpersecond':10,
-            'smmoverhead':70,
-            'binsize':100,
-            'binpacker':'DefaultBin',
-            'cpus':1,
-            'checksplitter':'DefaultTasks',
-            'rantask':'reschedule',
+            'taskgran':50, #Task Granularity
+            'smmpersecond':10, #SMMs per second
+            'smmoverhead':70, #SMI Overhead
+            'binsize':100, # Bin Size
+            'binpacker':'DefaultBin', #Bin Packer
+            'cpus':1, #Number of CPUs
+            'checksplitter':'DefaultTasks', #Chosen CheckSplitter
+            'rantask':'reschedule', #What to do when task is complete
         }
         self.__checksplitter = None
         self.__binpacker = None
@@ -30,10 +38,13 @@ class SchedulerState:
         self.__time = 0
         self.__done = False
 
+        # Update all the var states with defaults so they
+        # are logged
         for k, v in self.__state.items():
             self.__updateVarState(k, v)
 
     def ranTask(self, time, task):
+        """ Runs the neccesary clean up after task ran """
         self.__logger.removeTask(time, task)
         if self.getVar('rantask') == 'reschedule':
             task.reset()
@@ -45,16 +56,25 @@ class SchedulerState:
             self.logger.error("Unknwon rantask setting")
 
     def simRunning(self):
+        """ Is the simulation running? """
         return not self.__done
 
     def getTime(self):
+        """ What is the current time? """
         return self.__time
 
     def moveTime(self, t):
+        """ Move the time forward
+
+        By only moving the time forward, we prevent all sorts
+        of issues where the time state is inconsistent or
+        logged in a strange order.
+        """
         assert(t >= 0)
         self.__time += t
 
     def findCheck(self, parent_name, name):
+        """ Finds a given check name within the class """
         parent = self.__checks.get(parent_name)
         if parent is None:
             return None
@@ -62,6 +82,7 @@ class SchedulerState:
         return parent.getCheck(name)
 
     def addCheck(self, group, new_check):
+        """ Adds a check of the given name """
         if group in self.__checks:
             parent = self.__checks[group]
         else:
@@ -78,6 +99,11 @@ class SchedulerState:
             self.__binpacker.addTask(t)
 
     def __updateVarState(self, k, v):
+        """ Handle special cases for var changes like BinPacker, Checksplitter
+
+        This is for variable changes which have other impacts on the simulator
+        like instantiating objects or other side effects.
+        """
         if k == 'binpacker':
             binpackers = getBinPackers()
             old = self.__binpacker
@@ -89,6 +115,7 @@ class SchedulerState:
             self.__checksplitter = checksplitters[v]()
 
     def removeCheck(self, check):
+        """ Removes a specified check """
         self.__logger.timeEvent(self.__time, 0, "rm_check", msg="Removed {}".format(check))
 
         subcheck = check.getGroup().removeSubCheck(check.getName())
@@ -96,31 +123,40 @@ class SchedulerState:
             self.__binpacker.removeSubCheck(subcheck)
 
     def updateVar(self, k, v):
+        """ Updates an internal variable state """
         self.__logger.timeEvent(self.__time, 0, "varchange", msg="Changed Var {} to {}".format(k, v))
         self.__state[k] = v
         self.__updateVarState(k, v)
 
     def endSim(self):
+        """ Force the simulation to end """
         self.__done = True
 
     def getVar(self, k):
+        """ Gets the current value of a state var """
         return self.__state[k]
 
     def getPacker(self):
+        """ Get the current bin packer """
         return self.__binpacker
 
     def getSplitter(self):
+        """ Get the current task splitter """
         return self.__splitter
 
     def getLogger(self):
+        """ Get the current logger """
         return self.__logger
 
     def getCheckGroups(self):
+        """ Get the list of check groups """
         return self.__checks
 
 class RunWorkload:
+    """ Runs a given workload by interacting with the SimulatorState """
     def __init__(self, state, stream, interactive, validate):
         def parse_json_stream(stream_name):
+            """ Parses an incoming json stream workload """
             if stream_name == '-':
                 stream = sys.stdin
             else:
@@ -159,6 +195,7 @@ class RunWorkload:
                             raise
 
         self.__state = state
+        #Set of possible commands from workload
         self.__cmds = {
             'newcheck':lambda msg : self.createCheck(msg['checks']),
             'removecheck':lambda msg : self.removeCheck(msg['checks']),
@@ -169,11 +206,13 @@ class RunWorkload:
         self.__nextEvent = None
 
     def createCheck(self, checks):
+        """ Creates a set of checks in the simulator state """
         for c in checks:
             new = Check(c['name'], c['priority'], c['cost'])
             self.__state.addCheck(c['group'], new)
 
     def removeCheck(self, checks):
+        """ Removes a set of checks from the simulator state """
         for c in checks:
             found = self.__state.findCheck(c['group'], c['name'])
             if found:
@@ -182,11 +221,14 @@ class RunWorkload:
                 self.__state.getLogger().error(self.__state.getTime(), "Can't find check {}.{}".format(c['group'], c['name']))
 
     def changeVars(self, vars):
+        """ Changes the specified vars in the simulator state """
         for k,v in vars.items():
             self.__state.updateVar(k, v)
 
     def updateWorkload(self):
+        """ Updates the workload to the current time index """
         def getNextEvent():
+            """ Only get a new event if there is no deferred event """
             valid = False
             e = None
             while e is None:
@@ -234,11 +276,13 @@ def main():
 
     args = parser.parse_args()
 
+    #Choose desired logger
     if args.sqllog != "":
         logger = log.SqliteLog(args.verbose, args.sqllog)
     else:
         logger = log.SimLog(args.verbose)
 
+    # Collect system stats
     misc = {
         'start_gmt':timelib.strftime("%a, %d %b %Y %X +0000", timelib.gmtime()),
         'start_local':timelib.strftime("%a, %d %b %Y %X +0000"),
@@ -254,21 +298,25 @@ def main():
     for k,v in misc.items():
         logger.addMisc(k, v)
 
+    #initiliaze system state and workload
     state = SchedulerState(logger)
     workload = RunWorkload(state, args.workload, args.interactive, args.validate)
 
+    #Run the actual simulation
     workload.updateWorkload() #Updates all the time zero events
     while state.simRunning():
         workload.updateWorkload()
         next_time = state.getTime() + one_second//state.getVar('smmpersecond')
         bins = []
         cpu_count = state.getVar('cpus')
+        # Collect bins to be run
         for cpu_id in range(cpu_count):
             bins.append(state.getPacker().requestBin(state, cpu_id))
             logger.timeEvent(state.getTime(), state.getVar('smmoverhead'), "SMI", cpu=cpu_id)
 
         state.moveTime(state.getVar('smmoverhead'))
 
+        #Determine ordering in tasks across bins
         planned_tasks = []
         for b, cpu_id in zip(bins, range(cpu_count)):
             start_times = map(int, np.cumsum([0] + [t.getCost() for t in b.getTasks()]))
@@ -278,9 +326,11 @@ def main():
 
         planned_tasks = sorted(planned_tasks, key=lambda t : t[1])
 
+        #Start bins
         for b, cpu_id in zip(bins, range(cpu_count)):
             logger.timeEvent(state.getTime(), 0, "bin_start", cpu=cpu_id, bin=b)
 
+        #Run tasks within bins
         time = state.getTime()
         for (t, start_time, b, cpu_id) in planned_tasks:
             state.moveTime(time + start_time - state.getTime())
@@ -301,6 +351,7 @@ def main():
 
     logger.timeEvent(state.getTime(), 0, "end_sim")
 
+    #Capture system state at the end of simulation
     misc = {
         'end_gmt':timelib.strftime("%a, %d %b %Y %X +0000", timelib.gmtime()),
         'end_local':timelib.strftime("%a, %d %b %Y %X +0000"),

@@ -2,23 +2,30 @@
 import sqlite3
 import os
 
+""" A set of Logging Classes for use with the simulator """
+
 class SimLog(object):
+    """ Logs to stdout the plain text form of the log """
     def __init__(self, verbose):
         self._verbose = verbose
 
     def addMisc(self, key, val):
+        """ Miscellaneous informatino notification """
         if self._verbose:
             print("Misc: {}:{}".format(key, val))
 
     def addTask(self, time, task):
+        """ A task was added """
         if self._verbose:
             self.printTimeEvent(time, 0, "add_task", task=task)
 
     def removeTask(self, time, task):
+        """ A task was removed """
         if self._verbose:
             self.printTimeEvent(time, 0, "rm_task", task=task)
 
     def printTimeEvent(self, time, length, event, task=None, cpu=None, bin=None, msg=None):
+        """ Print the info about an an event """
         bin_id = None
         if bin is not None:
             bin_id = bin.getId()
@@ -43,24 +50,31 @@ class SimLog(object):
             print(fmt.format(**items))
 
     def timeEvent(self, time, length, event, task=None, cpu=None, bin=None, msg=None):
+        """ An event occurred """
         self.printTimeEvent(time, length, event, task, cpu, bin, msg)
 
     def warning(self, time, msg):
+        """ The simulator warned about something """
         print("{:020d}: Warning {}".format(time, msg))
 
     def error(self, time, msg):
+        """ The simulator errored """
         print("{:020d}: Error {}".format(time, msg))
 
     def endLog(self):
+        """ Terminate Log """
         pass
 
 class SqliteLog(SimLog):
+    """ A Sqlite Log that is stored in a specified file """
     def __init__(self, verbose, location):
         super().__init__(verbose)
         self.__tasks = {}
         self.__events = {}
         self.__eventid = 0
         self.__taskid = 0
+
+        #Attempt to remove existing log
         try:
             os.remove(location)
         except OSError as e:
@@ -71,6 +85,7 @@ class SqliteLog(SimLog):
         self.__cursor = self.__conn.cursor()
         c = self.__cursor
 
+        #Create various tables
         c.execute("""
         CREATE TABLE event
         (
@@ -102,6 +117,7 @@ class SqliteLog(SimLog):
         )
 
     def addMisc(self, key, val):
+        """ Log Miscellaneous information """
         if self._verbose:
             super().addMisc(key, val)
 
@@ -112,6 +128,7 @@ class SqliteLog(SimLog):
 
 
     def addTask(self, time, task):
+        """ Log task addition """
         i = self.__taskid
         self.__taskid += 1
 
@@ -124,10 +141,12 @@ class SqliteLog(SimLog):
         self.timeEvent(time, 0, "add_task", task=task)
 
     def removeTask(self, time, task):
+        """ Log task removal """
         self.timeEvent(time, 0, "rm_task", task=task)
         del self.__tasks[task]
 
     def timeEvent(self, time, length, event, task=None, cpu=None, bin=None, msg=None):
+        """ Log event occured """
         if self._verbose:
             super().timeEvent(time, length, event, task, cpu, bin, msg)
 
@@ -155,5 +174,6 @@ class SqliteLog(SimLog):
         )
 
     def endLog(self):
+        """End the log by cleaning up the database connection """
         self.__conn.commit()
         self.__conn.close()

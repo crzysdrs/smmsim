@@ -7,10 +7,13 @@ import json
 import os
 import sys
 
+""" Benchmarking tool to compute various statistics from the Simulation Run DB """
 def taskid(name):
+    """ Helper function to create subquery for getting event type ids """
     return "(select id from event_type where name = '{}')".format(name)
 
 def avghist(data, weights, bins=None):
+    """ Compute the average of data in histogram buckets """
     if bins is not None:
         sums = np.histogram(data, weights=weights, bins=bins)[0]
         (counts, buckets) = np.histogram(data, bins=bins)
@@ -26,6 +29,7 @@ def avghist(data, weights, bins=None):
     return (bin_means, buckets)
 
 def binresponsetime(conn):
+    """ Determine the average response time for tasks in bins (histograms) """
     c = conn.cursor()
     sql = """
     select task.cost, task.priority, finished.time - event.time as responsetime, finished.time, event.time
@@ -54,6 +58,7 @@ def binresponsetime(conn):
     return r
 
 def responsetime(conn):
+    """ Determine the average response time for tasks in bins """
     c = conn.cursor()
     results = c.execute("""
     select finished.time, event.time, finished.time - event.time as responsetime
@@ -82,12 +87,14 @@ def responsetime(conn):
     }
 
 def maxtime(conn):
+    """ Determine the last simulation time """
     c = conn.cursor()
     r = c.execute("SELECT max(time) as max_time FROM event WHERE bin_id not null").fetchall()
     last_time = r[0]['max_time']
     return last_time
 
 def cputime(conn):
+    """ Compute the CPU time of the simulated machine in SMM """
     c = conn.cursor()
     r = c.execute("SELECT SUM(length) as total_bin_time FROM event WHERE bin_id not null").fetchall()
     total_bin_time = r[0]['total_bin_time'];
@@ -103,11 +110,13 @@ def cputime(conn):
 
 
 def totaltasks(conn):
+    """ Compute the total number of tasks executed """
     c = conn.cursor()
     r = c.execute("SELECT count(id) as total_tasks FROM event WHERE type_id = " + taskid("run_task")).fetchall()
     return r[0]['total_tasks']
 
 def throughput(conn):
+    """ Determine the number of tasks per second """
     c = conn.cursor()
     last_time = maxtime(conn)
     total_tasks = totaltasks(conn)
@@ -117,6 +126,7 @@ def throughput(conn):
     }
 
 def throughputbin(conn):
+    """ Determine the total number of tasks run per bin """
     c = conn.cursor()
     bc = bincount(conn)
     total_tasks = totaltasks(conn)
@@ -125,6 +135,7 @@ def throughputbin(conn):
     }
 
 def bincount(conn):
+    """ Determine the total bins executed """
     c = conn.cursor()
     r = c.execute("""
     select sum(length) as bin_length
@@ -151,6 +162,7 @@ def bincount(conn):
     }
 
 def miscdata(conn):
+    """ Collect the misc data in the DB """
     c = conn.cursor()
     r = c.execute("select * from misc").fetchall()
     return {
